@@ -1,6 +1,6 @@
 # Runtime architecture
 
-Status: proposed design; interfaces and defaults below are not implemented.
+Status: target design. A narrower Sequential prototype now exists; [runtime usage](runtime-usage.md) documents its implemented guarantees and limits. In particular, containers, Hierarchical/Search executors, dynamic switching, full work-unit graphs, and MCP remain unimplemented.
 
 ## Control boundary
 

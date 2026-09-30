@@ -20,7 +20,7 @@ Proposed workflow:
 4. If progress stalls, explain whether Tiller continues, retries, switches, or stops.
 5. Present patch, checks, trace, spend, and unresolved requirements for review.
 
-Commands such as `tiller run`, `tiller inspect`, and `tiller resume` are proposed interfaces, not available commands.
+The early CLI now supports `run`, `inspect`, and `resume` through `npm run tiller -- ...` after building. See [runtime usage](runtime-usage.md). The remainder of this document describes the product direction; the full release scope is not implemented yet.
 
 ## Problems and responses
 

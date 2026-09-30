@@ -1,12 +1,14 @@
 # Implementation roadmap
 
-This roadmap follows dependencies rather than promising dates. Commit each completed major change separately. The current repository contains design documents only.
+This roadmap follows dependencies rather than promising dates. Commit each completed major change separately. The repository now contains a working first Sequential prototype; see [runtime usage](runtime-usage.md). The architecture below remains the broader target.
 
 ## 0. Product and evidence foundation
 
 Delivered: connected repository, research audit, product scope, architecture, and evaluation design. No provider credentials or model executions are needed for this stage.
 
 ## 1. Smallest working controlled run
+
+Current implementation: typed task/decision contracts, SQLite state and events, file gateway, scripted and OpenAI Responses adapters, Sequential loop, CLI, bounded checks, patch artifacts, checkpoints, cancellation, and explicit reconciliation. The offline fixture passes real checks. Live-provider quality and billing are unverified without credentials. Execution currently uses trusted local processes rather than a security sandbox, and scope is limited to an explicit small file set. Full hierarchical work-unit modeling and sandboxing are future work.
 
 Implement typed run/plan/event schemas, a deterministic transition core, SQLite event persistence, a tool gateway, a scripted test adapter, and a local CLI. Add one real provider adapter and a Sequential executor. Support a bounded repository task with read/edit/test tools, explicit acceptance checks, resource reservations, cancellation, inspection, and checkpoints.
 
@@ -67,4 +69,4 @@ tests/             transition, crash, budget, isolation scenarios
 eval/              fixtures, manifests, baselines, reports
 ```
 
-Next concrete engineering task: milestone 1, with one provider and sandbox choice, one fixture repository, and one complete verified run before expanding the strategy set.
+Next engineering work: validate the live adapter with user-configured credentials on the fixture, establish the sandbox boundary for larger/untrusted tasks, and add milestone 2's Hierarchical executor and comparable baselines. The scripted fixture is an engineering demonstration, not an efficacy result.
