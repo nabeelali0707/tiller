@@ -7,6 +7,7 @@ import type { Adapter, Run } from './core/contracts.js';
 import { Store } from './storage/store.js';
 import { ScriptedAdapter } from './adapters/scripted.js';
 import { OpenAIAdapter } from './adapters/openai.js';
+import { OllamaAdapter } from './adapters/ollama.js';
 import { createRun, execute, reconcileRun } from './executors/sequential.js';
 import { patchText } from './tools/workspace.js';
 
@@ -25,15 +26,20 @@ const help = `Tiller - local Sequential execution runtime (Node 24.14+)
   validate <task.json>      Validate a task manifest without executing commands
 
 Options: --data-dir <path> (default .tiller in current directory), --help
-Live runs require OPENAI_API_KEY and --model or TILLER_MODEL.
+Local models: --provider ollama --model <installed-model> [--ollama-url http://127.0.0.1:11434]
+OpenAI: --provider openai with OPENAI_API_KEY and --model or TILLER_MODEL.
 Checks execute local code. Use only trusted repositories/check commands.
 Workspace copies are not security sandboxes. Source files are not auto-updated.
 `;
 
-function adapterFor(script?: string, model?: string): Adapter {
-  if (script && model) throw new Error('Use either --script or --model');
-  return script ? ScriptedAdapter.fromFile(resolve(script)) :
-    new OpenAIAdapter(model ?? process.env.TILLER_MODEL ?? '', process.env.OPENAI_API_KEY ?? '');
+function adapterFor(script?: string, model?: string, provider?: string, ollamaUrl?: string): Adapter {
+  if (script && (model || provider || ollamaUrl)) throw new Error('Use either --script or provider/model options');
+  if (script) return ScriptedAdapter.fromFile(resolve(script));
+  const selected = provider ?? process.env.TILLER_PROVIDER ?? 'openai';
+  if (selected === 'ollama') return new OllamaAdapter(model ?? process.env.TILLER_MODEL ?? '', ollamaUrl);
+  if (selected !== 'openai') throw new Error('Provider must be ollama or openai');
+  if (ollamaUrl) throw new Error('--ollama-url requires --provider ollama');
+  return new OpenAIAdapter(model ?? process.env.TILLER_MODEL ?? '', process.env.OPENAI_API_KEY ?? '');
 }
 
 function report(store: Store, run: Run) {
@@ -52,6 +58,7 @@ function report(store: Store, run: Run) {
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({ allowPositionals: true, strict: true, options: {
     help: { type: 'boolean' }, script: { type: 'string' }, model: { type: 'string' },
+    provider: { type: 'string' }, 'ollama-url': { type: 'string' },
     'data-dir': { type: 'string' }, 'accept-workspace': { type: 'boolean' }, 'confirm-owner-stopped': { type: 'boolean' },
   } });
   if (values.help || positionals.length === 0) { console.log(help); return; }
@@ -59,7 +66,7 @@ async function main(): Promise<void> {
   if (positionals.length !== 2 || !target) throw new Error('Expected a command and task file/run ID; see --help');
   if (!['run', 'resume', 'inspect', 'trace', 'diff', 'cancel', 'reconcile', 'unlock', 'validate'].includes(command!))
     throw new Error(`Unknown command: ${command}`);
-  if ((values.script || values.model) && !['run', 'resume'].includes(command!)) throw new Error('Adapter options only apply to run/resume');
+  if ((values.script || values.model || values.provider || values['ollama-url']) && !['run', 'resume'].includes(command!)) throw new Error('Adapter options only apply to run/resume');
   if (values['accept-workspace'] && command !== 'reconcile') throw new Error('--accept-workspace is only valid for reconcile');
   if (values['confirm-owner-stopped'] && command !== 'unlock') throw new Error('--confirm-owner-stopped is only valid for unlock');
   const loadTask = () => {
@@ -71,7 +78,7 @@ async function main(): Promise<void> {
   const store = new Store(values['data-dir'] ?? '.tiller');
   try {
     if (command === 'run' || command === 'resume') {
-      const adapter = adapterFor(values.script, values.model);
+      const adapter = adapterFor(values.script, values.model, values.provider, values['ollama-url']);
       const run = command === 'run' ? createRun(store, loadTask(), adapter) : store.load(target);
       console.error(`Run ${run.id}\nWorkspace: ${join(store.directory(run.id), 'workspace')}`);
       const controller = new AbortController();

@@ -31,6 +31,16 @@ npm run build
 npm run tiller -- run examples/repair/task.json --model YOUR_MODEL_ID
 ```
 
+You can also run an already-installed local Ollama model without an API key:
+
+```sh
+ollama serve
+# In another terminal, after npm run build:
+npm run tiller -- run examples/repair/task.json --provider ollama --model llama3.2:3b
+```
+
+Use `ollama list` to choose a model installed on your machine. Tiller does not download models. Its Ollama adapter accepts only loopback IP endpoints and rejects cloud model tags.
+
 Live runs send the task and observed file/check content to OpenAI. Do not include secrets in the declared inputs. The adapter has mocked HTTP contract tests; a paid live request has not been tested in this workspace because no API key was configured.
 
 See [runtime usage](docs/runtime-usage.md) for task manifests, limits, cancellation, and recovery.
