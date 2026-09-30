@@ -1,0 +1,17 @@
+[
+  {
+    "remainingPlan": ["Read the faulty implementation", "Replace subtraction with addition", "Verify regression checks"],
+    "reason": "The baseline check failed. Inspect the declared editable file.",
+    "action": { "type": "read", "path": "add.cjs" }
+  },
+  {
+    "remainingPlan": ["Replace subtraction with addition", "Verify regression checks"],
+    "reason": "The fixture implementation subtracts its operands.",
+    "action": { "type": "write", "path": "add.cjs", "content": "exports.add = (a, b) => a + b;\n" }
+  },
+  {
+    "remainingPlan": ["Verify all required regression checks"],
+    "reason": "The candidate repair is written; the runtime must verify it.",
+    "action": { "type": "complete", "summary": "Changed subtraction to addition in add.cjs." }
+  }
+]

@@ -18,6 +18,7 @@
     "tiller": "node dist/src/cli.js"
   },
   "dependencies": {
+    "diff": "^9.0.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 import { copyFileSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
+import { createTwoFilesPatch } from 'diff';
 import { relativeFile } from '../core/contracts.js';
 import type { Run, Task } from '../core/contracts.js';
 
@@ -71,10 +72,15 @@ export function writeAllowed(run: Run, workspace: string, file: string, content:
   writeFileSync(safeFile(workspace, file), content, 'utf8');
 }
 
-export function changes(run: Run, directory: string): unknown[] {
+export interface FileChange { path: string; before: string; after: string; beforeHash: string; afterHash: string }
+export function changes(run: Run, directory: string): FileChange[] {
   return run.task.editable.flatMap((file) => {
     const before = readFileSync(safeFile(join(directory, 'original'), file), 'utf8');
     const after = readFileSync(safeFile(join(directory, 'workspace'), file), 'utf8');
     return before === after ? [] : [{ path: file, before, after, beforeHash: hash(before), afterHash: hash(after) }];
   });
+}
+
+export function patchText(run: Run, directory: string): string {
+  return changes(run, directory).map((c) => createTwoFilesPatch(`a/${c.path}`, `b/${c.path}`, c.before, c.after, '', '')).join('\n');
 }
