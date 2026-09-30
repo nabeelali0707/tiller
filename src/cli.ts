@@ -8,10 +8,10 @@ import { Store } from './storage/store.js';
 import { ScriptedAdapter } from './adapters/scripted.js';
 import { OpenAIAdapter } from './adapters/openai.js';
 import { OllamaAdapter } from './adapters/ollama.js';
-import { createRun, execute, reconcileRun } from './executors/sequential.js';
+import { createRun, execute, reconcileRun } from './executors/runtime.js';
 import { patchText } from './tools/workspace.js';
 
-const help = `Tiller - local Sequential execution runtime (Node 24.14+)
+const help = `Tiller - local agent execution runtime (Node 24.14+)
 
   run <task.json> [--script <decisions.json> | --model <model-id>]
   resume <run-id> [--script <same-decisions.json> | --model <same-model-id>]
@@ -50,7 +50,7 @@ function report(store: Store, run: Run) {
     budget: run.task.budget, spent: { modelCalls: run.calls, toolCalls: run.tools,
       inputTokens: run.inputTokens, outputTokens: run.outputTokens, unknownUsageCalls: run.unknownUsageCalls },
     planVersion: run.planVersion, remainingPlan: run.remainingPlan, pending: run.pending,
-    observations: run.observations, hashes: run.hashes,
+    observations: run.observations, hashes: run.hashes, strategy: run.task.strategy ?? 'sequential', hierarchy: run.hierarchy ?? null,
     artifacts: run.status === 'succeeded' ? ['changes.patch', 'changes.json'].map((p) => join(store.directory(run.id), p)) : [],
   };
 }

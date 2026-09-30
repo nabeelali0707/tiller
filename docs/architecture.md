@@ -1,6 +1,6 @@
 # Runtime architecture
 
-Status: target design. A narrower Sequential prototype now exists; [runtime usage](runtime-usage.md) documents its implemented guarantees and limits. In particular, containers, Hierarchical/Search executors, dynamic switching, full work-unit graphs, and MCP remain unimplemented.
+Status: target design. Sequential and bounded Hierarchical prototypes now exist; [runtime usage](runtime-usage.md) documents their guarantees and limits. Containers, Search, dynamic switching, arbitrary work-unit graphs, and MCP remain unimplemented.
 
 ## Control boundary
 

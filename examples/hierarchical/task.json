@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "strategy": "hierarchical",
+  "goal": "Fix add.cjs so numeric addition is correct. First inspect the implementation, then repair and verify it.",
+  "repository": "../repair/repo",
+  "files": ["add.cjs", "add.test.cjs"],
+  "editable": ["add.cjs"],
+  "checks": [{ "id": "addition", "command": "node", "args": ["add.test.cjs"], "timeoutMs": 5000 }],
+  "budget": { "maxModelCalls": 12, "maxToolCalls": 20, "maxDurationMs": 600000, "maxOutputTokensPerCall": 2048 }
+}

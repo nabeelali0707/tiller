@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { planTreeSchema } from './hierarchy.js';
+import type { Hierarchy } from './hierarchy.js';
 
 export const relativeFile = z.string().min(1).max(240).refine((p) =>
   !p.includes('\\') && !p.includes(':') && !p.startsWith('/') &&
@@ -11,6 +13,7 @@ export const relativeFile = z.string().min(1).max(240).refine((p) =>
 export const taskSchema = z.object({
   version: z.literal(1),
   goal: z.string().min(1).max(12_000),
+  strategy: z.enum(['sequential', 'hierarchical']).default('sequential'),
   repository: z.string().min(1),
   files: z.array(relativeFile).min(1).max(200),
   editable: z.array(relativeFile).min(1).max(100),
@@ -38,6 +41,7 @@ export const taskSchema = z.object({
 export type Task = z.infer<typeof taskSchema>;
 
 export const decisionSchema = z.object({
+  nodeId: z.string().optional(),
   remainingPlan: z.array(z.string().min(1).max(500)).min(1).max(8),
   reason: z.string().min(1).max(2000),
   action: z.discriminatedUnion('type', [
@@ -45,6 +49,7 @@ export const decisionSchema = z.object({
     z.object({ type: z.literal('write'), path: relativeFile, content: z.string().max(64_000) }).strict(),
     z.object({ type: z.literal('check'), checkId: z.string().min(1) }).strict(),
     z.object({ type: z.literal('complete'), summary: z.string().min(1).max(2000) }).strict(),
+    z.object({ type: z.literal('decompose'), nodes: planTreeSchema }).strict(),
   ]),
 }).strict();
 export type Decision = z.infer<typeof decisionSchema>;
@@ -67,11 +72,12 @@ export interface Run {
   decisionIndex: number;
   planVersion: number;
   remainingPlan: string[];
-  pending: { id: string; kind: string; detail: unknown } | null;
+  pending: { id: string; kind: string; detail: unknown; nodeId?: string | null } | null;
   hashes: Record<string, string>;
   baselineDone: boolean;
   observations: Observation[];
   message: string;
+  hierarchy?: Hierarchy;
 }
 export interface AdapterReply { decision: unknown; usage?: { inputTokens: number; outputTokens: number } }
 export interface Adapter {

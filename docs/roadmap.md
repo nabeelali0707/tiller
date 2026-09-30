@@ -1,6 +1,6 @@
 # Implementation roadmap
 
-This roadmap follows dependencies rather than promising dates. Commit each completed major change separately. The repository now contains a working first Sequential prototype; see [runtime usage](runtime-usage.md). The architecture below remains the broader target.
+This roadmap follows dependencies rather than promising dates. Commit each completed major change separately. The repository now contains Sequential and Hierarchical prototypes; see [runtime usage](runtime-usage.md). The architecture below remains the broader target.
 
 ## 0. Product and evidence foundation
 
@@ -23,6 +23,8 @@ Acceptance:
 Suggested commits: state contracts; durable run core; gateway and adapter; Sequential vertical slice. Each commit includes appropriate focused verification.
 
 ## 2. Hierarchical control and baseline harness
+
+Implemented: bounded tree validation, deterministic eligible-leaf dispatch, read/check evidence, parent aggregation, stale-check invalidation, and an offline fixture. Flat ReAct/Plan+ReAct controls and a comparative harness are still in progress. Evidence currently demonstrates runtime correctness, not agent efficacy.
 
 Add bounded tree decomposition, prerequisite validation, leaf dispatch, parent aggregation, and immutable plan revisions. Build Flat ReAct and Plan+ReAct comparison paths sharing model and tools. Run a small harness pilot to validate resource accounting and task manifests.
 

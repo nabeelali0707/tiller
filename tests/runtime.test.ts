@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Store } from '../src/storage/store.js';
 import { ScriptedAdapter } from '../src/adapters/scripted.js';
-import { createRun, execute, reconcileRun } from '../src/executors/sequential.js';
+import { createRun, execute, reconcileRun } from '../src/executors/runtime.js';
 import { taskSchema } from '../src/core/contracts.js';
 import type { Adapter, Decision, Task } from '../src/core/contracts.js';
 

@@ -4,7 +4,7 @@ Keep your agent on course.
 
 Tiller is a local execution runtime for AI coding agents: explicit execution strategies, observable tool activity, verified outcomes, and bounded recovery.
 
-**Status: early Sequential runtime prototype.** A working CLI, SQLite traces, copied workspaces, budget limits, acceptance checks, interruption recovery, an offline scripted adapter, and an OpenAI Responses adapter are implemented. Hierarchical execution, Search, dynamic routing, MCP, and the editor integration remain planned. No agent-performance benchmark results are claimed.
+**Status: early execution runtime prototype.** Sequential and Hierarchical execution, CLI, SQLite traces, copied workspaces, budget limits, acceptance checks, interruption recovery, scripted/Ollama/OpenAI adapters are implemented. Search, dynamic routing, MCP, and the editor integration remain planned. No agent-performance benchmark results are claimed.
 
 ## Try it
 
@@ -40,6 +40,14 @@ npm run tiller -- run examples/repair/task.json --provider ollama --model llama3
 ```
 
 Use `ollama list` to choose a model installed on your machine. Tiller does not download models. Its Ollama adapter accepts only loopback IP endpoints and rejects cloud model tags.
+
+For a deterministic Hierarchical example:
+
+```sh
+npm run tiller -- run examples/hierarchical/task.json --script examples/hierarchical/script.json
+```
+
+The runtime dispatches an investigation leaf, requires actual file-read evidence, then dispatches its dependent repair leaf and checks the result before aggregating the parent. All task checks run again before final success.
 
 Live runs send the task and observed file/check content to OpenAI. Do not include secrets in the declared inputs. The adapter has mocked HTTP contract tests; a paid live request has not been tested in this workspace because no API key was configured.
 

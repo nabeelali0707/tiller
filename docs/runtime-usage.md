@@ -4,7 +4,24 @@
 
 Tiller runs a Sequential loop: propose one bounded action and a revised remaining plan, validate the proposal, persist operation intent, execute through the gateway, record its result and file hashes, then replan. Completion proposals trigger all declared acceptance checks. A failed check returns to the loop; no model completion claim can bypass verification.
 
-The current tool set is read an existing declared file, replace an existing editable file, run a named check, or propose completion. Plans and actions are recorded as immutable event entries. This prototype does not implement parent-child work units, new-file creation, arbitrary agent shell access, automatic source patch promotion, MCP, Search, or strategy switching.
+The current tool set is read an existing declared file, replace an existing editable file, run a named check, or propose completion. Plans and actions are recorded as immutable event entries. Hierarchical runs also have an initial decomposition operation and runtime-dispatched parent-child work units. New-file creation, arbitrary agent shell access, automatic source patch promotion, MCP, Search, and strategy switching are not implemented.
+
+## Hierarchical execution
+
+Set `"strategy": "hierarchical"` in the task manifest (default: `sequential`). The first decision proposes a tree using `action.type: decompose`. A tree has one root, 3-24 uniquely identified nodes, maximum depth 4, and at least two children per parent. Parents use `acceptance: {"type":"children"}`. Investigation leaves require actual file reads with `{"type":"read","paths":[...]}`; repair leaves require passing named checks with `{"type":"checks","checkIds":[...]}`. Read evidence represents an observation at a point in time, not a guarantee that the file will remain unchanged.
+
+Every node has `id`, `parentId`, `goal`, `dependsOn`, and `acceptance`. Dependencies reference siblings only; cycles, missing references, impossible parents, and undeclared acceptance resources are rejected before dispatch. Ancestor dependencies also gate all leaves in that subtree. Ready leaves are chosen deterministically in declared array order.
+
+Worker decisions must include the runtime's active `nodeId`. A worker cannot choose another leaf or skip prerequisites. Read leaves cannot write or run checks. Repair completion triggers that leaf's checks; failure keeps it active. Parents aggregate only after all children finish. Actual evidence remains in the operation trace, separate from model-written summaries. Tool/model intents carry node IDs.
+
+Writes and reconciliation invalidate completed check-backed nodes and their ancestors. Read-only evidence remains a historical observation. Once all nodes complete, every task check runs again. If final acceptance fails, the run fails rather than silently replacing its tree. Start a new attempt with a revised tree for now; automatic hierarchy revision is future work.
+
+```sh
+npm run build
+npm run tiller -- run examples/hierarchical/task.json --script examples/hierarchical/script.json
+```
+
+All strategies share the same tool gateway, persistence, integrity checks, cancellation, and budgets. Decomposition and leaf verification consume that common budget. There are no concurrent workers or sandbox claims.
 
 ## Setup and offline example
 
@@ -29,6 +46,22 @@ npm run tiller -- diff RUN_ID
 `trace` emits NDJSON events and never reexecutes tools. `inspect` reports the last persisted checkpoint, pending operation, plan, recent observations, usage, deadline, and artifact paths. `diff` compares current workspace files with the captured originals, so external edits after completion can differ from the verified hashes. The saved `changes.patch` is the artifact from successful verification; inspect hashes before treating later workspace contents as verified.
 
 ## Live provider
+
+### Local Ollama
+
+No API key is needed. Start Ollama and select an installed local model:
+
+```sh
+ollama serve
+# In another terminal:
+npm run tiller -- run examples/repair/task.json --provider ollama --model lfm2.5:8b
+```
+
+The command requires the model to have finished downloading. Tiller never pulls models or falls back to another one. `TILLER_PROVIDER=ollama` and `TILLER_MODEL` can replace flags. `--ollama-url` accepts only HTTP loopback IPs (`127.0.0.1` or `[::1]`) with an optional port. DNS names, external hosts, redirects, credential-bearing URLs, and cloud model tags are rejected. Operators must still use a genuinely local model rather than a server alias to a remote service.
+
+The adapter uses `/api/chat`, nonstreaming schema-constrained output, temperature 0, an 8192-token context setting, and the task's output cap as `num_predict`. Prompt and generated-token counts enter the usage ledger. Incomplete output never executes tools. Available RAM and model support affect whether a request runs; protocol support alone does not prove coding quality. Cancelling a request may take time to unload the model. [Ollama API reference](https://docs.ollama.com/api/chat).
+
+### OpenAI
 
 The first network adapter uses OpenAI's Responses endpoint with a JSON decision format, explicit model selection, `store: false`, a per-call output-token limit, and cancellation. Runtime schema validation applies independently of model output. See the [official structured output documentation](https://developers.openai.com/api/docs/guides/structured-outputs) for the distinction between JSON output and schema adherence.
 

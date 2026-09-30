@@ -1,0 +1,18 @@
+[
+  {
+    "remainingPlan": ["Inspect", "Repair", "Verify"],
+    "reason": "Separate investigation from a test-backed repair.",
+    "action": {
+      "type": "decompose",
+      "nodes": [
+        { "id": "root", "parentId": null, "goal": "Repair addition", "dependsOn": [], "acceptance": { "type": "children" } },
+        { "id": "inspect", "parentId": "root", "goal": "Read the implementation", "dependsOn": [], "acceptance": { "type": "read", "paths": ["add.cjs"] } },
+        { "id": "repair", "parentId": "root", "goal": "Correct arithmetic and pass addition checks", "dependsOn": ["inspect"], "acceptance": { "type": "checks", "checkIds": ["addition"] } }
+      ]
+    }
+  },
+  { "nodeId": "inspect", "remainingPlan": ["Read source"], "reason": "Collect required evidence.", "action": { "type": "read", "path": "add.cjs" } },
+  { "nodeId": "inspect", "remainingPlan": ["Finish inspection"], "reason": "The source was read.", "action": { "type": "complete", "summary": "The implementation subtracts instead of adding." } },
+  { "nodeId": "repair", "remainingPlan": ["Replace subtraction", "Verify"], "reason": "Fix the observed arithmetic operation.", "action": { "type": "write", "path": "add.cjs", "content": "exports.add = (a, b) => a + b;\n" } },
+  { "nodeId": "repair", "remainingPlan": ["Verify repair"], "reason": "Request evidence-backed completion.", "action": { "type": "complete", "summary": "Addition now uses the plus operator." } }
+]

@@ -7,6 +7,8 @@ import { Store } from '../storage/store.js';
 import { assertCheckpoint, assertProtected, changes, hashes, patchText, readAllowed, snapshot, writeAllowed } from '../tools/workspace.js';
 import { runCheck } from '../tools/checks.js';
 import type { CheckResult } from '../tools/checks.js';
+import { buildHierarchy, nextLeaf, completeLeaf, invalidateChecks } from '../core/hierarchy.js';
+import { hash } from '../tools/workspace.js';
 
 export function createRun(store: Store, task: Task, adapter: Adapter): Run {
   task = taskSchema.parse(task);
@@ -17,7 +19,7 @@ export function createRun(store: Store, task: Task, adapter: Adapter): Run {
     decisionIndex: 0, planVersion: 0, remainingPlan: [], pending: null,
     hashes: snapshot(task, store.directory(id)), baselineDone: false, observations: [], message: '',
   };
-  store.save(run, 'run.created', { executionMode: 'trusted-local', strategy: 'sequential', adapter: adapter.id, snapshot: run.hashes });
+  store.save(run, 'run.created', { executionMode: 'trusted-local', strategy: task.strategy, adapter: adapter.id, snapshot: run.hashes });
   return run;
 }
 
@@ -37,6 +39,7 @@ export function reconcileRun(store: Store, id: string): Run {
     const pending = run.pending;
     run.hashes = hashes(run.task, join(directory, 'workspace'));
     run.pending = null;
+    if (run.hierarchy) invalidateChecks(run.hierarchy);
     transition(run, 'paused', 'Operator accepted current workspace; all acceptance checks will be rerun');
     observe(run, 'reconciled', { pending, hashes: run.hashes });
     store.save(run, 'run.reconciled', { pending, hashes: run.hashes, provenance: 'operator-confirmed' });
@@ -96,7 +99,7 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
     const check = async (definition: Task['checks'][number], final: boolean): Promise<CheckResult> => {
       ensureActive(); assertCheckpoint(run, workspace); assertProtected(run, directory);
       reserve(run, 'tool', 1, final);
-      run.pending = { id: randomUUID(), kind: 'check', detail: { checkId: definition.id, final } };
+      run.pending = { id: randomUUID(), kind: 'check', nodeId: final ? null : run.hierarchy?.activeId ?? null, detail: { checkId: definition.id, final } };
       store.save(run, 'operation.started', run.pending);
       const result = await runCheck(definition, workspace, controller.signal, run.deadline! - Date.now());
       // Acceptance commands may execute code, but changing declared files invalidates the checkpoint.
@@ -105,7 +108,7 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
       ensureActive();
       return result;
     };
-    const tool = async (action: Exclude<Action, { type: 'complete' }>) => {
+    const tool = async (action: Exclude<Action, { type: 'complete' | 'decompose' }>) => {
       if (action.type === 'check') {
         const definition = run.task.checks.find((c) => c.id === action.checkId);
         if (!definition) throw new Error(`Unknown check: ${action.checkId}`);
@@ -113,12 +116,19 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
       }
       ensureActive(); assertCheckpoint(run, workspace); assertProtected(run, directory);
       reserve(run, 'tool');
-      run.pending = { id: randomUUID(), kind: action.type, detail: action };
+      run.pending = { id: randomUUID(), kind: action.type, nodeId: run.hierarchy?.activeId ?? null, detail: action };
       store.save(run, 'operation.started', run.pending);
       let result: unknown;
       try {
-        if (action.type === 'read') result = { path: action.path, content: readAllowed(run, workspace, action.path) };
-        else { writeAllowed(run, workspace, action.path, action.content); result = { path: action.path, written: true }; }
+        if (action.type === 'read') {
+          const content = readAllowed(run, workspace, action.path);
+          result = { path: action.path, content };
+          if (run.hierarchy?.activeId) run.hierarchy.progress[run.hierarchy.activeId]!.reads[action.path] = hash(content);
+        } else {
+          writeAllowed(run, workspace, action.path, action.content);
+          const invalidated = run.hierarchy ? invalidateChecks(run.hierarchy) : [];
+          result = { path: action.path, written: true, invalidated };
+        }
       } catch (error) {
         // A failed write can be partial. Leave it pending rather than declaring a known outcome.
         if (action.type === 'write') throw error;
@@ -136,8 +146,25 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
       }
       while (true) {
         ensureActive(); assertCheckpoint(run, workspace); assertProtected(run, directory);
+        let hierarchyFinished = false;
+        if (run.hierarchy) {
+          const leaf = nextLeaf(run.hierarchy);
+          if (leaf) {
+            if (run.hierarchy.activeId !== leaf.id) {
+              if (run.hierarchy.activeId && run.hierarchy.progress[run.hierarchy.activeId]!.status === 'active')
+                run.hierarchy.progress[run.hierarchy.activeId]!.status = 'pending';
+              run.hierarchy.activeId = leaf.id;
+              run.hierarchy.progress[leaf.id]!.status = 'active';
+              store.save(run, 'node.dispatched', { nodeId: leaf.id, goal: leaf.goal, acceptance: leaf.acceptance });
+            }
+          } else {
+            hierarchyFinished = run.hierarchy.nodes.every((node) => run.hierarchy!.progress[node.id]!.status === 'completed');
+            if (!hierarchyFinished) throw new Error('Hierarchy has unfinished nodes but no eligible leaf');
+          }
+        }
+        if (!hierarchyFinished) {
         reserve(run, 'model');
-        run.pending = { id: randomUUID(), kind: 'model', detail: { adapter: adapter.id } };
+        run.pending = { id: randomUUID(), kind: 'model', nodeId: run.hierarchy?.activeId ?? null, detail: { adapter: adapter.id } };
         store.save(run, 'model.started', run.pending);
         const reply = await adapter.next(structuredClone(run), controller.signal);
         if (reply.usage && Number.isSafeInteger(reply.usage.inputTokens) && reply.usage.inputTokens >= 0 &&
@@ -156,6 +183,33 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
           continue;
         }
         const decision = parsed.data;
+        const reject = (message: string) => {
+          run.decisionIndex++;
+          observe(run, 'invalid_decision', { error: message });
+          store.save(run, 'decision.rejected', { message, nodeId: decision.nodeId ?? null });
+        };
+        if (decision.action.type === 'decompose') {
+          if (run.task.strategy !== 'hierarchical' || run.hierarchy) {
+            reject('Decomposition is allowed only once at the start of a Hierarchical run'); continue;
+          }
+          try { run.hierarchy = buildHierarchy(decision.action.nodes, run.task.files, run.task.checks.map((c) => c.id)); }
+          catch (error) { reject(error instanceof Error ? error.message : 'Invalid hierarchy'); continue; }
+          run.decisionIndex++; run.planVersion++; run.remainingPlan = decision.remainingPlan;
+          store.save(run, 'hierarchy.created', { version: run.planVersion, nodes: run.hierarchy.nodes, reason: decision.reason });
+          continue;
+        }
+        if (run.task.strategy === 'hierarchical' && !run.hierarchy) {
+          reject('First propose a bounded hierarchy with action.type decompose'); continue;
+        }
+        if (run.hierarchy && decision.nodeId !== run.hierarchy.activeId) {
+          reject(`Only the runtime-dispatched node ${run.hierarchy.activeId} may act; include its nodeId`); continue;
+        }
+        if (run.hierarchy?.activeId) {
+          const leaf = run.hierarchy.nodes.find((node) => node.id === run.hierarchy!.activeId)!;
+          if (leaf.acceptance.type === 'read' && decision.action.type !== 'read' && decision.action.type !== 'complete') {
+            reject('Read-evidence nodes may only read declared files and propose completion'); continue;
+          }
+        }
         run.decisionIndex++;
         run.planVersion++;
         run.remainingPlan = decision.remainingPlan;
@@ -164,8 +218,29 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
           await tool(decision.action);
           continue;
         }
+        if (run.hierarchy?.activeId) {
+          const tree = run.hierarchy;
+          const leaf = tree.nodes.find((node) => node.id === tree.activeId)!;
+          let accepted = false;
+          if (leaf.acceptance.type === 'read') {
+            accepted = leaf.acceptance.paths.every((path) => Boolean(tree.progress[leaf.id]!.reads[path]));
+          } else if (leaf.acceptance.type === 'checks') {
+            const results: CheckResult[] = [];
+            for (const checkId of leaf.acceptance.checkIds) results.push(await check(run.task.checks.find((c) => c.id === checkId)!, false));
+            accepted = results.every((result) => result.passed);
+          }
+          if (accepted) {
+            const completed = completeLeaf(tree, leaf, decision.action.summary);
+            store.save(run, 'node.completed', { nodeId: leaf.id, completed, acceptance: leaf.acceptance, hashes: run.hashes });
+          } else {
+            observe(run, 'node_completion_rejected', { nodeId: leaf.id, acceptance: leaf.acceptance });
+            store.save(run, 'node.completion_rejected', { nodeId: leaf.id });
+          }
+          continue;
+        }
+        }
         transition(run, 'verifying');
-        store.save(run, 'verification.started', { completionProposal: decision.action.summary });
+        store.save(run, 'verification.started', { source: hierarchyFinished ? 'hierarchy-completed' : 'model-completion' });
         const results: CheckResult[] = [];
         for (const definition of run.task.checks) results.push(await check(definition, true));
         ensureActive();
@@ -179,6 +254,12 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
           break;
         }
         transition(run, 'running', 'Completion rejected: acceptance checks failed');
+        if (run.hierarchy) {
+          // A failed final check must be addressed by a fresh run/tree if the accepted tree
+          // did not cover it. Do not silently rewrite the declared hierarchy or spin forever.
+          transition(run, 'failed', 'All hierarchy nodes completed but final acceptance failed');
+          store.save(run, 'run.failed', { results }); break;
+        }
         observe(run, 'completion_rejected', { results });
         store.save(run, 'verification.failed', { results });
       }
