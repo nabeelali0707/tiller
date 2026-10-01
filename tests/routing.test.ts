@@ -20,10 +20,14 @@ test('dynamic hierarchy to sequential to Search keeps workspace, budgets, histor
     const adapter: Adapter = { id: 'dynamic-fixture', next: async (run) => {
       if (run.task.strategy === 'hierarchical') {
         if (run.decisionIndex < 3) return { decision: script[run.decisionIndex] };
+        if (run.decisionIndex === 3) return { decision: { nodeId: 'repair', reason: 'Preserve partial investigation', remainingPlan: ['Repair', 'Verify'],
+          action: { type: 'write', path: 'add.cjs', content: 'exports.add=(a,b)=>a-b; // partial investigation\n' } } };
         return { decision: { nodeId: 'repair', reason: 'Request evidence', remainingPlan: ['Verify'], action: { type: 'complete', summary: 'Proposed repair' } } };
       }
-      if (run.task.goal.includes('Search candidate') && run.decisionIndex === 0)
+      if (run.task.goal.includes('Search candidate') && run.decisionIndex === 0) {
+        assert.match(readFileSync(join(store.directory(run.id), 'original/add.cjs'), 'utf8'), /partial investigation/);
         return { decision: { reason: 'Apply repair', remainingPlan: ['Repair', 'Verify'], action: { type: 'write', path: 'add.cjs', content: 'exports.add=(a,b)=>a+b;\n' } } };
+      }
       return { decision: { reason: 'Request evidence', remainingPlan: ['Verify'], action: { type: 'complete', summary: 'Proposed repair' } } };
     } };
     const run = createRun(store, task, adapter);
