@@ -10,7 +10,7 @@ Local verification covers schema and gateway boundaries, real acceptance checks,
 
 Outstanding release gates:
 
-- Expand live LFM validation beyond the initial fixture; record model identity, failures and real outcomes. The exact model is installed.
+- Complete a successful live LFM repair, then expand validation beyond the initial fixture. The exact model is installed and responds locally, but observed latency and invalid decision shapes prevented a verified repair; see the recorded failures.
 - Keep running the actual Docker isolation probes on supported environments. Local probes, scripted Docker Search and Linux CI have passed; these are bounded checks rather than a containment audit.
 - Collect a frozen, representative external task set with repository-family-disjoint development/held-out partitions; evaluate fixed strategies, fixed retries and dynamic switching under comparable caps.
 - Measure failure rates, cost and latency; do not substitute deterministic scripted results for model results.

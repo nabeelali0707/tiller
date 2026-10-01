@@ -20,6 +20,8 @@ Run `7323486d-e7b6-45cf-b0f4-92c60c40d05f` exhausted its ten-minute deadline dur
 
 Liquid AI's [model card](https://huggingface.co/LiquidAI/LFM2.5-8B-A1B) describes explicit reasoning before the final answer. The runtime's `think:false` request does not guarantee that this model template omits reasoning.
 
+The warm run `abe6dec8-dc30-47e6-8fc7-68b3fce3e831` returned a JSON decision with a string `action`; schema validation rejected it without executing tools. It was cancelled while retrying. The runtime now returns bounded field-specific validation errors to the next model request, and the prompt explicitly requires a nested action object. The final diagnostic run `cd3e7127-ee53-4df9-b5cb-21f36ab646df` used a four-call cap and the updated feedback. Generation fell to roughly 0.6 tokens/second. Its request returned HTTP 500 after 13 minutes 32 seconds, without a usable first decision. Tiller paused and retained the charged request as unknown usage. The subsequent cancellation request was processed without another model call. No end-to-end LFM repair success is claimed. Local latency, model output conformance and a complete live repair remain validation gates.
+
 ## Interfaces and evaluation
 
 Dashboard authentication/origin tests and actual MCP stdio negotiation pass. The dashboard was inspected in the in-app browser, including its narrow layout, observed hierarchy events and patch preview. The local VS Code extension was packaged as a VSIX and installed through VS Code's CLI; its backend invokes the actual CLI in integration tests. An interactive editor/user pilot has not been completed.
@@ -28,4 +30,4 @@ Independent evaluation tests demonstrate a repair passing agent-visible checks b
 
 ## Package and checks
 
-All 51 tests passed locally with `TILLER_DOCKER_TESTS=1`: no skips or failures. [CI for d5e0301](https://github.com/nabeelali0707/tiller/actions/runs/36839168065) also passed. The npm archive excludes run data, credentials, dependencies, tests and stale build output. A separate-prefix installation of the archive ran the scripted repair successfully (`23035c1f-f867-4dc6-a9b3-7729d5b25364`). The production dependency audit reported no known vulnerabilities at this time. These checks do not replace deployment review.
+All 51 tests passed locally with `TILLER_DOCKER_TESTS=1`: no skips or failures. The later bounded-feedback change also passed eleven focused runtime tests and [CI for cd14a24](https://github.com/nabeelali0707/tiller/actions/runs/36840718038). The npm archive excludes run data, credentials, dependencies, tests and stale build output. A separate-prefix installation of the archive ran the scripted repair successfully (`23035c1f-f867-4dc6-a9b3-7729d5b25364`). The production dependency audit reported no known vulnerabilities at this time. These checks do not replace deployment review.
