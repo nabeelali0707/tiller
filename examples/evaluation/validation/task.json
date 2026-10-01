@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "goal": "Repair discount.cjs. discount(price, percent) must return price * (1 - percent / 100). Both inputs must be finite numbers, price nonnegative, and percent in [0, 100]; throw RangeError otherwise. Preserve the CommonJS export.",
+  "repository": "./repo",
+  "files": ["discount.cjs", "discount.test.cjs"],
+  "editable": ["discount.cjs"],
+  "checks": [{ "id": "discount", "command": "node", "args": ["discount.test.cjs"], "timeoutMs": 5000 }],
+  "budget": { "maxModelCalls": 12, "maxToolCalls": 20, "maxDurationMs": 600000, "maxOutputTokensPerCall": 4096 }
+}

@@ -2,7 +2,7 @@
   "name": "tiller-runtime",
   "version": "0.1.0",
   "private": true,
-  "description": "A local, verifiable Sequential execution runtime for coding agents",
+  "description": "A local, verifiable execution runtime for coding agents",
   "type": "module",
   "engines": {
     "node": ">=24.14.0"
@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "demo": "npm run build && node dist/src/cli.js run examples/repair/task.json --script examples/repair/script.json",
+    "demo:suite": "npm run build && node dist/src/cli.js evaluate examples/evaluation/suite.json --scripted",
     "tiller": "node dist/src/cli.js"
   },
   "dependencies": {

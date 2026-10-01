@@ -8,7 +8,7 @@ Delivered: connected repository, research audit, product scope, architecture, an
 
 ## 1. Smallest working controlled run
 
-Current implementation: typed task/decision contracts, SQLite state and events, file gateway, scripted and OpenAI Responses adapters, Sequential loop, CLI, bounded checks, patch artifacts, checkpoints, cancellation, and explicit reconciliation. The offline fixture passes real checks. Live-provider quality and billing are unverified without credentials. Execution currently uses trusted local processes rather than a security sandbox, and scope is limited to an explicit small file set. Full hierarchical work-unit modeling and sandboxing are future work.
+Current implementation: typed task/decision contracts, SQLite state and events, file gateway, scripted/Ollama/OpenAI adapters, Sequential loop, CLI, bounded checks, patch artifacts, checkpoints, cancellation, and explicit reconciliation. Offline fixtures pass real checks. Live-provider quality remains unverified. Execution currently uses trusted local processes rather than a security sandbox, and scope is limited to an explicit small file set. Sandbox execution is future work.
 
 Implement typed run/plan/event schemas, a deterministic transition core, SQLite event persistence, a tool gateway, a scripted test adapter, and a local CLI. Add one real provider adapter and a Sequential executor. Support a bounded repository task with read/edit/test tools, explicit acceptance checks, resource reservations, cancellation, inspection, and checkpoints.
 
@@ -24,7 +24,7 @@ Suggested commits: state contracts; durable run core; gateway and adapter; Seque
 
 ## 2. Hierarchical control and baseline harness
 
-Implemented: bounded tree validation, deterministic eligible-leaf dispatch, read/check evidence, parent aggregation, stale-check invalidation, and an offline fixture. Flat ReAct/Plan+ReAct controls and a comparative harness are still in progress. Evidence currently demonstrates runtime correctness, not agent efficacy.
+Implemented: bounded tree validation, deterministic eligible-leaf dispatch, read/check evidence, parent aggregation, stale-check invalidation, Flat ReAct/Plan+ReAct controls, single-task comparison, and a task-suite harness with three development fixtures. Evidence currently demonstrates runtime correctness, not agent efficacy. Held-out task collection remains future work.
 
 Add bounded tree decomposition, prerequisite validation, leaf dispatch, parent aggregation, and immutable plan revisions. Build Flat ReAct and Plan+ReAct comparison paths sharing model and tools. Run a small harness pilot to validate resource accounting and task manifests.
 

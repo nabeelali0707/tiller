@@ -1,0 +1,39 @@
+[
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "normalize.cjs"
+    }
+  },
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "lookup.cjs"
+    }
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "normalize.cjs",
+      "content": "exports.normalize = (value) => value.trim().toLowerCase();\n"
+    }
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "lookup.cjs",
+      "content": "const { normalize } = require('./normalize.cjs');\nexports.lookup = (users, email) => users.find((user) => normalize(user.email) === normalize(email));\n"
+    }
+  },
+  {
+    "reason": "Request real acceptance checks.",
+    "action": {
+      "type": "complete",
+      "summary": "Known fixture repair applied."
+    }
+  }
+]

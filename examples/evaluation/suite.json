@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Tiller development repair fixtures",
+  "cases": [
+    { "id": "addition", "task": "../repair/task.json", "scripts": {
+      "flat-react": "../comparison/flat.json", "plan-react": "../comparison/plan.json",
+      "sequential": "../repair/script.json", "hierarchical": "../hierarchical/script.json"
+    } },
+    { "id": "validation", "task": "validation/task.json", "scripts": {
+      "flat-react": "validation/scripts/flat-react.json", "plan-react": "validation/scripts/plan-react.json",
+      "sequential": "validation/scripts/sequential.json", "hierarchical": "validation/scripts/hierarchical.json"
+    } },
+    { "id": "dependencies", "task": "dependencies/task.json", "scripts": {
+      "flat-react": "dependencies/scripts/flat-react.json", "plan-react": "dependencies/scripts/plan-react.json",
+      "sequential": "dependencies/scripts/sequential.json", "hierarchical": "dependencies/scripts/hierarchical.json"
+    } }
+  ]
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "reason": "Declare an initial contextual plan.",
+    "action": {
+      "type": "plan",
+      "steps": [
+        "Read source",
+        "Repair behavior",
+        "Verify"
+      ]
+    }
+  },
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "discount.cjs"
+    }
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "discount.cjs",
+      "content": "exports.discount = (price, percent) => {\n  if (!Number.isFinite(price) || !Number.isFinite(percent) || price < 0 || percent < 0 || percent > 100) throw new RangeError('Invalid discount inputs');\n  return price * (1 - percent / 100);\n};\n"
+    }
+  },
+  {
+    "reason": "Request real acceptance checks.",
+    "action": {
+      "type": "complete",
+      "summary": "Known fixture repair applied."
+    }
+  }
+]

@@ -1,0 +1,90 @@
+[
+  {
+    "reason": "Gate repair on source inspection.",
+    "action": {
+      "type": "decompose",
+      "nodes": [
+        {
+          "id": "root",
+          "parentId": null,
+          "goal": "Repair the declared behavior",
+          "dependsOn": [],
+          "acceptance": {
+            "type": "children"
+          }
+        },
+        {
+          "id": "inspect",
+          "parentId": "root",
+          "goal": "Read all affected source files",
+          "dependsOn": [],
+          "acceptance": {
+            "type": "read",
+            "paths": [
+              "discount.cjs"
+            ]
+          }
+        },
+        {
+          "id": "repair",
+          "parentId": "root",
+          "goal": "Repair and verify",
+          "dependsOn": [
+            "inspect"
+          ],
+          "acceptance": {
+            "type": "checks",
+            "checkIds": [
+              "discount"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "discount.cjs"
+    },
+    "nodeId": "inspect",
+    "remainingPlan": [
+      "Read required files"
+    ]
+  },
+  {
+    "reason": "Request real acceptance checks.",
+    "action": {
+      "type": "complete",
+      "summary": "Known fixture repair applied."
+    },
+    "nodeId": "inspect",
+    "remainingPlan": [
+      "Finish inspection"
+    ]
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "discount.cjs",
+      "content": "exports.discount = (price, percent) => {\n  if (!Number.isFinite(price) || !Number.isFinite(percent) || price < 0 || percent < 0 || percent > 100) throw new RangeError('Invalid discount inputs');\n  return price * (1 - percent / 100);\n};\n"
+    },
+    "nodeId": "repair",
+    "remainingPlan": [
+      "Apply repair and verify"
+    ]
+  },
+  {
+    "reason": "Request real acceptance checks.",
+    "action": {
+      "type": "complete",
+      "summary": "Known fixture repair applied."
+    },
+    "nodeId": "repair",
+    "remainingPlan": [
+      "Verify repair"
+    ]
+  }
+]

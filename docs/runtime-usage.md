@@ -37,6 +37,19 @@ Use `--strategies flat-react,sequential` to select conditions. Repeats must be 1
 
 Reports are saved to `.tiller/comparisons/<comparison-id>/report.json` after each run, including run IDs, acceptance outcomes, token counts, unknown usage, and elapsed time. Ctrl+C preserves a partial report. A completed comparison exits 0 even when individual runs fail; an interrupted comparison exits 2. This is a single visible-check fixture harness, not a benchmark, hidden-test evaluation, or evidence of general strategy superiority. Scripted decisions test runtime behavior only.
 
+## Task suites
+
+`evaluate <suite.json>` runs the selected comparisons across up to 20 tasks. A suite contains `version: 1`, a `name`, and `cases` with unique `id` and `task` fields. Task paths are relative to the suite file; each task's repository remains relative to its own task file. Optional `scripts` maps strategy names to script paths relative to the suite. Scripts are used only when `--scripted` is explicitly supplied. All task manifests and selected adapter configurations are validated before any case starts.
+
+```sh
+npm run demo:suite
+npm run tiller -- evaluate examples/evaluation/suite.json --provider ollama --model lfm2.5:8b --strategies sequential,hierarchical --repeats 2
+```
+
+Every condition and repeat has its own task budget, deadline, copied workspace, and run trace. A suite can therefore cost more than a single run; it does not share a total run budget. Source hashes are checked between conditions within each task comparison. Reports under `.tiller/suites/<suite-id>/report.json` contain each task's comparison report and path. Interrupted evaluations retain completed tasks and the current partial comparison, then stop dispatching further cases. Automatic suite resume is not implemented; individual paused runs can be inspected and resumed with normal commands.
+
+A completed suite exits 0 when evaluation finishes, including unsuccessful run outcomes; inspect `accepted` and `outcome` to assess results. Interrupted evaluation exits 2; configuration errors exit 1. The included development cases cover arithmetic, range/type validation, and a two-file dependency repair. Known-answer scripts can be regenerated with `node examples/evaluation/generate-scripts.mjs`. They validate control flow only and are not held-out tasks or evidence of model quality.
+
 ## Setup and offline example
 
 Use Node 24.14+ and npm. Node 24 may print an experimental warning for its built-in SQLite API. SQLite uses WAL mode and full synchronous writes. Run data belong on a local filesystem, not a shared network drive.

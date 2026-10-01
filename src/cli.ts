@@ -12,6 +12,7 @@ import { createRun, execute, reconcileRun } from './executors/runtime.js';
 import { patchText } from './tools/workspace.js';
 import { compare, strategies } from './eval/compare.js';
 import type { Strategy } from './eval/compare.js';
+import { evaluateSuite } from './eval/suite.js';
 
 const help = `Tiller - local agent execution runtime (Node 24.14+)
 
@@ -29,6 +30,8 @@ const help = `Tiller - local agent execution runtime (Node 24.14+)
   compare <task.json>       Compare strategies with identical inputs/tools/budget caps
                            --strategies flat-react,plan-react,sequential,hierarchical --repeats 1
                            Use provider/model options or --scripts <strategy-to-script JSON>
+  evaluate <suite.json>     Run comparisons across a task suite; use --scripted for fixtures
+                           Accepts --strategies, --repeats and provider/model options
 
 Options: --data-dir <path> (default .tiller in current directory), --help
 Local models: --provider ollama --model <installed-model> [--ollama-url http://127.0.0.1:11434]
@@ -66,15 +69,20 @@ async function main(): Promise<void> {
     help: { type: 'boolean' }, script: { type: 'string' }, model: { type: 'string' },
     provider: { type: 'string' }, 'ollama-url': { type: 'string' },
     strategies: { type: 'string' }, repeats: { type: 'string' }, scripts: { type: 'string' },
+    scripted: { type: 'boolean' },
     'data-dir': { type: 'string' }, 'accept-workspace': { type: 'boolean' }, 'confirm-owner-stopped': { type: 'boolean' },
   } });
   if (values.help || positionals.length === 0) { console.log(help); return; }
   const [command, target] = positionals;
   if (positionals.length !== 2 || !target) throw new Error('Expected a command and task file/run ID; see --help');
-  if (!['run', 'resume', 'inspect', 'trace', 'diff', 'cancel', 'reconcile', 'unlock', 'validate', 'compare'].includes(command!))
+  if (!['run', 'resume', 'inspect', 'trace', 'diff', 'cancel', 'reconcile', 'unlock', 'validate', 'compare', 'evaluate'].includes(command!))
     throw new Error(`Unknown command: ${command}`);
-  if ((values.script || values.model || values.provider || values['ollama-url']) && !['run', 'resume', 'compare'].includes(command!)) throw new Error('Adapter options only apply to run/resume/compare');
-  if ((values.strategies || values.repeats || values.scripts) && command !== 'compare') throw new Error('Comparison options only apply to compare');
+  if ((values.script || values.model || values.provider || values['ollama-url']) && !['run', 'resume', 'compare', 'evaluate'].includes(command!)) throw new Error('Adapter options only apply to run/resume/compare/evaluate');
+  if ((values.strategies || values.repeats) && !['compare', 'evaluate'].includes(command!)) throw new Error('Comparison options only apply to compare/evaluate');
+  if (values.scripts && command !== 'compare') throw new Error('--scripts only applies to compare');
+  if (values.scripted && command !== 'evaluate') throw new Error('--scripted only applies to evaluate');
+  if (command === 'evaluate' && values.script) throw new Error('Use --scripted with suite script mappings');
+  if (values.scripted && (values.model || values.provider || values['ollama-url'])) throw new Error('Use either --scripted or provider options');
   if (command === 'compare' && values.script) throw new Error('Use --scripts for per-strategy comparison fixtures');
   if (values.scripts && (values.model || values.provider || values['ollama-url'])) throw new Error('Use either --scripts or provider options');
   if (values['accept-workspace'] && command !== 'reconcile') throw new Error('--accept-workspace is only valid for reconcile');
@@ -87,7 +95,20 @@ async function main(): Promise<void> {
   if (command === 'validate') { console.log(JSON.stringify(loadTask(), null, 2)); return; }
   const store = new Store(values['data-dir'] ?? '.tiller');
   try {
-    if (command === 'compare') {
+    if (command === 'evaluate') {
+      const conditions = (values.strategies?.split(',') ?? strategies) as Strategy[];
+      const controller = new AbortController();
+      const pause = () => controller.abort();
+      process.on('SIGINT', pause); process.on('SIGTERM', pause);
+      try {
+        const result = await evaluateSuite(store, target, conditions, Number(values.repeats ?? '1'),
+          (_strategy, script) => adapterFor(script, values.model, values.provider, values['ollama-url']),
+          values.scripted ?? false, controller.signal);
+        console.log(JSON.stringify({ path: result.path, status: result.report.status, error: result.report.error,
+          cases: result.report.results.map((entry) => ({ id: entry.caseId, path: entry.path, rows: entry.report.rows })) }, null, 2));
+        process.exitCode = result.report.status === 'completed' ? 0 : 2;
+      } finally { process.off('SIGINT', pause); process.off('SIGTERM', pause); }
+    } else if (command === 'compare') {
       const conditions = (values.strategies?.split(',') ?? strategies) as Strategy[];
       const repeats = Number(values.repeats ?? '1');
       let getAdapter: (strategy: Strategy) => Adapter;

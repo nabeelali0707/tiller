@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "goal": "Fix normalize.cjs and lookup.cjs. Normalize string emails by trimming whitespace and lowercasing. Lookup must apply that normalization to both the query and stored emails, return the first matching original user object or undefined, and leave the input array and user objects unchanged. Preserve CommonJS exports.",
+  "repository": "./repo",
+  "files": ["normalize.cjs", "lookup.cjs", "lookup.test.cjs"],
+  "editable": ["normalize.cjs", "lookup.cjs"],
+  "checks": [{ "id": "lookup", "command": "node", "args": ["lookup.test.cjs"], "timeoutMs": 5000 }],
+  "budget": { "maxModelCalls": 12, "maxToolCalls": 20, "maxDurationMs": 600000, "maxOutputTokensPerCall": 4096 }
+}

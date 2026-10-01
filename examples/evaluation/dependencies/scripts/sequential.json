@@ -1,0 +1,54 @@
+[
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "normalize.cjs"
+    },
+    "remainingPlan": [
+      "Inspect, repair and verify the declared behavior"
+    ]
+  },
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "lookup.cjs"
+    },
+    "remainingPlan": [
+      "Inspect, repair and verify the declared behavior"
+    ]
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "normalize.cjs",
+      "content": "exports.normalize = (value) => value.trim().toLowerCase();\n"
+    },
+    "remainingPlan": [
+      "Inspect, repair and verify the declared behavior"
+    ]
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "lookup.cjs",
+      "content": "const { normalize } = require('./normalize.cjs');\nexports.lookup = (users, email) => users.find((user) => normalize(user.email) === normalize(email));\n"
+    },
+    "remainingPlan": [
+      "Inspect, repair and verify the declared behavior"
+    ]
+  },
+  {
+    "reason": "Request real acceptance checks.",
+    "action": {
+      "type": "complete",
+      "summary": "Known fixture repair applied."
+    },
+    "remainingPlan": [
+      "Inspect, repair and verify the declared behavior"
+    ]
+  }
+]

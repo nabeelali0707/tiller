@@ -1,0 +1,12 @@
+const assert = require('node:assert/strict');
+const { normalize } = require('./normalize.cjs');
+const { lookup } = require('./lookup.cjs');
+assert.equal(normalize(' ALICE@Example.COM '), 'alice@example.com');
+const users = [{ id: 1, email: ' ALICE@EXAMPLE.com ' }, { id: 2, email: 'bob@example.com' }];
+const original = JSON.stringify(users);
+assert.equal(lookup(users, 'alice@example.COM').id, 1);
+assert.equal(lookup(users, ' BOB@example.com ').id, 2);
+assert.equal(lookup(users, 'missing@example.com'), undefined);
+assert.equal(lookup([], 'alice@example.com'), undefined);
+assert.equal(JSON.stringify(users), original);
+console.log('Normalization, lookup and nonmutation checks passed');

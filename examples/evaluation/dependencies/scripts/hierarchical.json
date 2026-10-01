@@ -1,0 +1,114 @@
+[
+  {
+    "reason": "Gate repair on source inspection.",
+    "action": {
+      "type": "decompose",
+      "nodes": [
+        {
+          "id": "root",
+          "parentId": null,
+          "goal": "Repair the declared behavior",
+          "dependsOn": [],
+          "acceptance": {
+            "type": "children"
+          }
+        },
+        {
+          "id": "inspect",
+          "parentId": "root",
+          "goal": "Read all affected source files",
+          "dependsOn": [],
+          "acceptance": {
+            "type": "read",
+            "paths": [
+              "normalize.cjs",
+              "lookup.cjs"
+            ]
+          }
+        },
+        {
+          "id": "repair",
+          "parentId": "root",
+          "goal": "Repair and verify",
+          "dependsOn": [
+            "inspect"
+          ],
+          "acceptance": {
+            "type": "checks",
+            "checkIds": [
+              "lookup"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "normalize.cjs"
+    },
+    "nodeId": "inspect",
+    "remainingPlan": [
+      "Read required files"
+    ]
+  },
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "lookup.cjs"
+    },
+    "nodeId": "inspect",
+    "remainingPlan": [
+      "Read required files"
+    ]
+  },
+  {
+    "reason": "Request real acceptance checks.",
+    "action": {
+      "type": "complete",
+      "summary": "Known fixture repair applied."
+    },
+    "nodeId": "inspect",
+    "remainingPlan": [
+      "Finish inspection"
+    ]
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "normalize.cjs",
+      "content": "exports.normalize = (value) => value.trim().toLowerCase();\n"
+    },
+    "nodeId": "repair",
+    "remainingPlan": [
+      "Apply repair and verify"
+    ]
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "lookup.cjs",
+      "content": "const { normalize } = require('./normalize.cjs');\nexports.lookup = (users, email) => users.find((user) => normalize(user.email) === normalize(email));\n"
+    },
+    "nodeId": "repair",
+    "remainingPlan": [
+      "Apply repair and verify"
+    ]
+  },
+  {
+    "reason": "Request real acceptance checks.",
+    "action": {
+      "type": "complete",
+      "summary": "Known fixture repair applied."
+    },
+    "nodeId": "repair",
+    "remainingPlan": [
+      "Verify repair"
+    ]
+  }
+]

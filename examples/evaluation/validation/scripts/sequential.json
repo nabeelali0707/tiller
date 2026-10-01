@@ -1,0 +1,33 @@
+[
+  {
+    "reason": "Inspect declared source.",
+    "action": {
+      "type": "read",
+      "path": "discount.cjs"
+    },
+    "remainingPlan": [
+      "Inspect, repair and verify the declared behavior"
+    ]
+  },
+  {
+    "reason": "Apply the known fixture repair.",
+    "action": {
+      "type": "write",
+      "path": "discount.cjs",
+      "content": "exports.discount = (price, percent) => {\n  if (!Number.isFinite(price) || !Number.isFinite(percent) || price < 0 || percent < 0 || percent > 100) throw new RangeError('Invalid discount inputs');\n  return price * (1 - percent / 100);\n};\n"
+    },
+    "remainingPlan": [
+      "Inspect, repair and verify the declared behavior"
+    ]
+  },
+  {
+    "reason": "Request real acceptance checks.",
+    "action": {
+      "type": "complete",
+      "summary": "Known fixture repair applied."
+    },
+    "remainingPlan": [
+      "Inspect, repair and verify the declared behavior"
+    ]
+  }
+]

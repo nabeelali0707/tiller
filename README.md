@@ -57,6 +57,16 @@ npm run tiller -- compare examples/repair/task.json --scripts examples/compariso
 
 Each condition gets a fresh workspace with the same inputs, checks, and budget caps. The JSON report records outcomes, resource use, latency, and links to run traces. Scripted results validate execution paths; they do not measure model performance.
 
+Run the development suite (addition, input validation, and a repair spanning two source files):
+
+```sh
+npm run demo:suite
+# Once LFM is installed, run the same suite with model decisions:
+npm run tiller -- evaluate examples/evaluation/suite.json --provider ollama --model lfm2.5:8b
+```
+
+Suite reports preserve each task's results and partial progress. Budgets apply separately to each run. These fixtures are development examples; a held-out evaluation remains future work.
+
 OpenAI runs send the task and observed file/check content to OpenAI; Ollama runs send it to the configured local server. Do not include secrets in the declared inputs. The adapters have mocked HTTP contract tests; a paid live request has not been tested in this workspace because no API key was configured.
 
 See [runtime usage](docs/runtime-usage.md) for task manifests, limits, cancellation, and recovery.
