@@ -1,6 +1,6 @@
 # Runtime architecture
 
-Status: target design. Sequential and bounded Hierarchical prototypes now exist; [runtime usage](runtime-usage.md) documents their guarantees and limits. Containers, Search, dynamic switching, arbitrary work-unit graphs, and MCP remain unimplemented.
+Status: broader target design. Sequential, bounded Hierarchical, Docker checks, Search, opt-in fixed switching and stdio MCP prototypes exist; [runtime usage](runtime-usage.md), [Search/routing](search-and-routing.md) and [interfaces](interfaces.md) document their actual limits. Arbitrary work-unit graphs, learned routing, concurrent workers and broader sandbox platforms remain unimplemented. Live model/isolation and efficacy validation are pending.
 
 ## Control boundary
 

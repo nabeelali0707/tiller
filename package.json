@@ -1,7 +1,8 @@
 {
   "name": "tiller-runtime",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
+  "license": "UNLICENSED",
+  "files": ["dist/src", "README.md", "docs", "examples"],
   "description": "A local, verifiable execution runtime for coding agents",
   "type": "module",
   "engines": {
@@ -11,7 +12,8 @@
     "tiller": "dist/src/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "demo": "npm run build && node dist/src/cli.js run examples/repair/task.json --script examples/repair/script.json",

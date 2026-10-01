@@ -1,6 +1,6 @@
 # Implementation roadmap
 
-This roadmap follows dependencies rather than promising dates. Commit each completed major change separately. The repository now contains Sequential and Hierarchical prototypes; see [runtime usage](runtime-usage.md). The architecture below remains the broader target.
+This roadmap follows dependencies rather than promising dates. Commit each completed major change separately. The repository contains runtime, Search/routing, evaluation and interface prototypes; see [release gates](release-checklist.md) for outstanding validation. The architecture below remains the broader target.
 
 ## 0. Product and evidence foundation
 
@@ -8,7 +8,7 @@ Delivered: connected repository, research audit, product scope, architecture, an
 
 ## 1. Smallest working controlled run
 
-Current implementation: typed task/decision contracts, SQLite state and events, file gateway, scripted/Ollama/OpenAI adapters, Sequential loop, CLI, bounded checks, patch artifacts, checkpoints, cancellation, and explicit reconciliation. Offline fixtures pass real checks. Live-provider quality remains unverified. Execution currently uses trusted local processes rather than a security sandbox, and scope is limited to an explicit small file set. Sandbox execution is future work.
+Current implementation: typed contracts, SQLite events, file gateway, scripted/Ollama/OpenAI adapters, Sequential loop, CLI, bounded checks, artifacts, checkpoints, durable queued actions, cancellation and reconciliation. Offline fixtures pass real checks. Live-provider quality remains unverified. Default execution uses trusted local processes; Docker mode is implemented with live isolation validation pending. Scope is limited to explicit small file sets.
 
 Implement typed run/plan/event schemas, a deterministic transition core, SQLite event persistence, a tool gateway, a scripted test adapter, and a local CLI. Add one real provider adapter and a Sequential executor. Support a bounded repository task with read/edit/test tools, explicit acceptance checks, resource reservations, cancellation, inspection, and checkpoints.
 
@@ -32,17 +32,23 @@ Acceptance: reject cyclic/oversized plans, block dependent leaves when prerequis
 
 ## 3. Isolated Search
 
+Implemented: mandatory Docker mode, image pinning, independent candidate workspaces, shared parent call/tool/deadline accounting, losing-candidate costs, visible-check selection, conflict-safe promotion and fresh verification. Unit scheduling tests pass with real local checks behind an injected backend. Real Docker probes and live Search remain pending because Docker Desktop exits on this machine.
+
 Add resettable candidate environments, shared budget allocation, visible-check-based selection, patch promotion, and post-promotion checks. Establish the supported sandbox platform and fail clearly when its isolation requirements are unavailable; do not silently substitute plain worktrees.
 
 Acceptance: candidates cannot alter each other's workspaces or trusted checks; both start from the same snapshot; losing candidates consume budget; no winner is claimed when all fail; destination conflicts preserve user work.
 
 ## 4. Experimental dynamic switching
 
+Implemented: disabled-by-default identical-check-failure monitor, Hierarchical -> Sequential -> Search policy, two-switch cap, cooldown, archived hierarchy, generation and checkpoint events, shared limits and deadline. Deterministic end-to-end handoff passes. Live efficacy versus fixed retries remains unevaluated.
+
 Implement a progress monitor, same-strategy recovery, switch policy, cooldown/caps, and checkpoint handoff. Add the Hierarchical -> Sequential -> Search demonstration with deterministic fixtures and a separate live evaluation.
 
 Acceptance: late callbacks cannot mutate a new segment; switches do not reset limits; completed work is retained where valid; stale checks are invalidated; unsupported or unaffordable switches are rejected. Test both recovery and failure/stop paths. Compare against fixed retries before enabling by default.
 
 ## 5. Integrations and usability
+
+Implemented: authenticated loopback dashboard with observed timeline/patch preview and scoped stdio MCP start/status/cancel/resume/artifact tools. Real stdio negotiation and interface request-boundary tests pass. A dedicated editor extension, user pilots and usability measurements remain future work. Best-effort presentation masking does not make raw local run data safe to publish.
 
 Expose the working coordinator through MCP run/status/cancel tools. Add an editor timeline from real events. State which adapters offer control versus observation and test those claims against actual host capabilities. Conduct developer pilots and measure diagnosis time and repeated use.
 
@@ -71,4 +77,4 @@ tests/             transition, crash, budget, isolation scenarios
 eval/              fixtures, manifests, baselines, reports
 ```
 
-Sequential, Hierarchical, the two reactive baselines, and a single-fixture comparison harness are implemented. Next engineering work: validate the selected local Ollama model on the fixture, add representative held-out tasks, and establish the sandbox boundary before larger/untrusted tasks. The scripted fixture is an engineering demonstration, not an efficacy result.
+The implementation paths above now exist, including independent private-check evaluation and prototype packaging. Next work: complete live LFM/Docker validation, collect a frozen external held-out task set, evaluate the fixed switching policy against controls, and pilot the product. Larger repositories and learned routing require those foundations. Scripted fixtures are engineering demonstrations, not efficacy results.

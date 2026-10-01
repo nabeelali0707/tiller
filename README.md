@@ -4,7 +4,7 @@ Keep your agent on course.
 
 Tiller is a local execution runtime for AI coding agents: explicit execution strategies, observable tool activity, verified outcomes, and bounded recovery.
 
-**Status: early execution runtime prototype.** Sequential and Hierarchical execution, reactive baselines, a strategy-comparison harness, CLI, SQLite traces, copied workspaces, budget limits, acceptance checks, interruption recovery, scripted/Ollama/OpenAI adapters are implemented. Search, dynamic routing, MCP, and the editor integration remain planned. No agent-performance benchmark results are claimed.
+**Status: early execution runtime prototype.** Sequential, Hierarchical, reactive baselines, Docker checks, budgeted Search, experimental strategy switching, evaluation suites/private checks, a local dashboard, scoped MCP tools, CLI, SQLite traces, budgets, acceptance and recovery are implemented. Live LFM and Docker validation are pending on this machine. Large repositories, an editor extension and representative held-out model evaluation remain future work. No agent-performance benchmark results are claimed.
 
 ## Try it
 
@@ -71,9 +71,18 @@ OpenAI runs send the task and observed file/check content to OpenAI; Ollama runs
 
 See [runtime usage](docs/runtime-usage.md) for task manifests, limits, cancellation, and recovery.
 
+Check setup and open the local interface:
+
+```sh
+npm run tiller -- doctor --model lfm2.5:8b
+npm run tiller -- dashboard
+```
+
+Read [Search and routing](docs/search-and-routing.md), [dashboard/MCP setup](docs/interfaces.md), [independent evaluation](docs/evaluation-usage.md), and [release gates](docs/release-checklist.md) for implemented behavior and outstanding validation.
+
 ## Current execution boundary
 
-The prototype executes **trusted local tasks**. File tools enforce explicit read/write lists in a copied workspace, but acceptance commands execute code with local process privileges. This is not a container or security sandbox. Do not use it on hostile repositories or untrusted check commands. API credentials are not forwarded to check processes; logs and artifacts may still contain sensitive source or check output.
+The default mode executes **trusted local tasks**. File tools enforce explicit read/write lists in a copied workspace, but local acceptance commands execute code with process privileges. Docker mode provides a separate constrained check environment and is mandatory for Search and MCP-started tasks. Live isolation validation is pending. Use trusted task manifests and images. API credentials are not forwarded to checks; raw logs and artifacts can still contain sensitive source or output.
 
 Success means the declared checks passed on the recorded files. It does not guarantee a correct solution beyond those checks. Patches are returned for review and are not automatically applied to the source repository.
 
@@ -88,10 +97,10 @@ Tiller records the plan, dispatched operation, observed result, and final verifi
 - Own the execution loop and dispatch one bounded work unit at a time.
 - Record actual tool calls, plan revisions, checks, resource use, and recovery decisions.
 - Start with Sequential and Hierarchical executors and explicit verification.
-- Add isolated Search candidates, then experimental dynamic switching.
+- Validate the implemented sandboxed Search candidates and experimental switching with live tasks.
 - Learn routing policies only after collecting useful, held-out evaluation evidence.
 
-MCP is a proposed integration surface. An ordinary MCP connection does not give Tiller control over a host agent's other tools. Observe-only integrations must be labeled accordingly.
+MCP tools delegate bounded tasks to Tiller's own coordinator. An ordinary MCP connection does not give Tiller control over a host agent's other tools.
 
 ## Design documents
 
@@ -106,7 +115,7 @@ MCP is a proposed integration surface. An ordinary MCP connection does not give 
 
 Oota et al., *Do LLM Agents Execute the Plans They Declare? From Planning-Mode Declaration to Pattern-Specific Execution*, arXiv:2609.38108v1, 29 September 2026. The supplied PDF is the source reviewed for this design. [Paper](https://arxiv.org/abs/2609.38108).
 
-Dynamic routing and learned selection are hypotheses to evaluate, not demonstrated Tiller capabilities. Dispatch order does not guarantee action correctness or task success.
+The implemented fixed switching policy and future learned selection are hypotheses to evaluate for efficacy. Dispatch order does not guarantee action correctness or task success.
 
 ## Development workflow
 
