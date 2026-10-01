@@ -2,6 +2,8 @@
 
 A local VS Code view of Tiller's persisted runs and observed events. Expanding a run shows resource use and its timeline. Context commands inspect checkpoints, preview the patch, and request cancellation. It does not start agents, apply patches, or govern other editor tools.
 
+The extension's violet T/checkmark logo is supplied as a 256-pixel [PNG icon](assets/icon.png), with an editable [SVG source](assets/icon.svg).
+
 Build Tiller with Node.js 24.14+: `npm ci` and `npm run build`. Package this extension with the official `@vscode/vsce` tool, then use VS Code's **Extensions: Install from VSIX** command. No Marketplace publication is performed.
 
 In a trusted local workspace, set **Tiller: Cli Path** to the absolute built `dist/src/cli.js` path if Tiller is not in that workspace. Set **Tiller: Node Path** if Node 24.14+ is not on PATH. Set **Tiller: Data Directory** to the run directory (default `.tiller`). Select a workspace folder when prompted, then use **Tiller: Refresh Runs**.

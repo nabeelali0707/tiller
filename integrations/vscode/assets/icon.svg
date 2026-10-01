@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <title>Tiller</title>
+  <desc>A white T and mint verification check on a violet tile.</desc>
+  <defs>
+    <linearGradient id="tile" x1="32" y1="16" x2="224" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B3FF5"/>
+      <stop offset="1" stop-color="#4F36C6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#tile)"/>
+  <path d="M64 84H184M124 84V184" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M160 164L179 183L208 144" stroke="#7AF0C4" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
