@@ -8,7 +8,7 @@ Delivered: connected repository, research audit, product scope, architecture, an
 
 ## 1. Smallest working controlled run
 
-Current implementation: typed contracts, SQLite events, file gateway, scripted/Ollama/OpenAI adapters, Sequential loop, CLI, bounded checks, artifacts, checkpoints, durable queued actions, cancellation and reconciliation. Offline fixtures pass real checks. Live-provider quality remains unverified. Default execution uses trusted local processes; Docker mode is implemented with live isolation validation pending. Scope is limited to explicit small file sets.
+Current implementation: typed contracts, SQLite events, file gateway, scripted/Ollama/OpenAI adapters, Sequential loop, CLI, bounded checks, artifacts, checkpoints, durable queued actions, cancellation and reconciliation. Offline fixtures pass real checks. Default execution uses trusted local processes; actual Docker probes also pass. Scope is limited to explicit small file sets. See validation results for live-model evidence and limits.
 
 Implement typed run/plan/event schemas, a deterministic transition core, SQLite event persistence, a tool gateway, a scripted test adapter, and a local CLI. Add one real provider adapter and a Sequential executor. Support a bounded repository task with read/edit/test tools, explicit acceptance checks, resource reservations, cancellation, inspection, and checkpoints.
 
@@ -32,7 +32,7 @@ Acceptance: reject cyclic/oversized plans, block dependent leaves when prerequis
 
 ## 3. Isolated Search
 
-Implemented: mandatory Docker mode, image pinning, independent candidate workspaces, shared parent call/tool/deadline accounting, losing-candidate costs, visible-check selection, conflict-safe promotion and fresh verification. Unit scheduling tests pass with real local checks behind an injected backend. Real Docker probes and live Search remain pending because Docker Desktop exits on this machine.
+Implemented: mandatory Docker mode, image pinning, independent candidate workspaces, shared parent call/tool/deadline accounting, losing-candidate costs, visible-check selection, conflict-safe promotion and fresh verification. Unit scheduling tests pass with real local checks behind an injected backend. Actual Docker probes and scripted Search also passed locally, with Linux isolation probes passing in CI.
 
 Add resettable candidate environments, shared budget allocation, visible-check-based selection, patch promotion, and post-promotion checks. Establish the supported sandbox platform and fail clearly when its isolation requirements are unavailable; do not silently substitute plain worktrees.
 
@@ -48,7 +48,7 @@ Acceptance: late callbacks cannot mutate a new segment; switches do not reset li
 
 ## 5. Integrations and usability
 
-Implemented: authenticated loopback dashboard with observed timeline/patch preview and scoped stdio MCP start/status/cancel/resume/artifact tools. Real stdio negotiation and interface request-boundary tests pass. A dedicated editor extension, user pilots and usability measurements remain future work. Best-effort presentation masking does not make raw local run data safe to publish.
+Implemented: authenticated loopback dashboard with observed timeline/patch preview, scoped stdio MCP start/status/cancel/resume/artifact tools, and a local VS Code run/event/patch extension. Real stdio negotiation, interface request-boundary tests and editor CLI integration pass. User pilots and usability measurements remain future work. Best-effort presentation masking does not make raw local run data safe to publish.
 
 Expose the working coordinator through MCP run/status/cancel tools. Add an editor timeline from real events. State which adapters offer control versus observation and test those claims against actual host capabilities. Conduct developer pilots and measure diagnosis time and repeated use.
 
@@ -77,4 +77,4 @@ tests/             transition, crash, budget, isolation scenarios
 eval/              fixtures, manifests, baselines, reports
 ```
 
-The implementation paths above now exist, including independent private-check evaluation and prototype packaging. Next work: complete live LFM/Docker validation, collect a frozen external held-out task set, evaluate the fixed switching policy against controls, and pilot the product. Larger repositories and learned routing require those foundations. Scripted fixtures are engineering demonstrations, not efficacy results.
+The implementation paths above now exist, including independent private-check evaluation and prototype packaging. Next work: expand live-model validation, collect a frozen external held-out task set, evaluate the fixed switching policy against controls, and pilot the product. Larger repositories and learned routing require those foundations. Scripted fixtures are engineering demonstrations, not efficacy results.

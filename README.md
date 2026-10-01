@@ -4,7 +4,7 @@ Keep your agent on course.
 
 Tiller is a local execution runtime for AI coding agents: explicit execution strategies, observable tool activity, verified outcomes, and bounded recovery.
 
-**Status: early execution runtime prototype.** Sequential, Hierarchical, reactive baselines, Docker checks, budgeted Search, experimental strategy switching, evaluation suites/private checks, a local dashboard, scoped MCP tools, CLI, SQLite traces, budgets, acceptance and recovery are implemented. Live LFM and Docker validation are pending on this machine. Large repositories, an editor extension and representative held-out model evaluation remain future work. No agent-performance benchmark results are claimed.
+**Status: early execution runtime prototype.** Sequential, Hierarchical, reactive baselines, Docker checks, budgeted Search, experimental strategy switching, evaluation suites/private checks, a local dashboard, scoped MCP tools, a local VS Code timeline extension, CLI, SQLite traces, budgets, acceptance and recovery are implemented. Actual Docker probes and scripted Search pass locally and Linux CI passes. The exact LFM model is installed; see [validation results](docs/validation-results.md) for live outcomes. Large repositories and representative held-out model evaluation remain future work. No agent-performance benchmark results are claimed.
 
 ## Try it
 
@@ -36,10 +36,10 @@ You can also run an already-installed local Ollama model without an API key:
 ```sh
 ollama serve
 # In another terminal, after npm run build:
-npm run tiller -- run examples/repair/task.json --provider ollama --model lfm2.5:8b
+npm run tiller -- run examples/local-smoke/task.json --provider ollama --model lfm2.5:8b --ollama-think false
 ```
 
-Use `ollama list` to choose a model installed on your machine. Tiller does not download models. Its Ollama adapter accepts only loopback IP endpoints and rejects cloud model tags.
+Use `ollama list` to choose a model installed on your machine. Tiller does not download models. Its Ollama adapter accepts only loopback IP endpoints and rejects cloud model tags. `--ollama-think` requests a thinking configuration; some model templates still return a thinking prefix. Tiller accepts only a closed leading prefix followed by strict JSON, excludes it from decisions and accounts for all tokens. Resume with the same configuration.
 
 For a deterministic Hierarchical example:
 
@@ -82,7 +82,7 @@ Read [Search and routing](docs/search-and-routing.md), [dashboard/MCP setup](doc
 
 ## Current execution boundary
 
-The default mode executes **trusted local tasks**. File tools enforce explicit read/write lists in a copied workspace, but local acceptance commands execute code with process privileges. Docker mode provides a separate constrained check environment and is mandatory for Search and MCP-started tasks. Live isolation validation is pending. Use trusted task manifests and images. API credentials are not forwarded to checks; raw logs and artifacts can still contain sensitive source or output.
+The default mode executes **trusted local tasks**. File tools enforce explicit read/write lists in a copied workspace, but local acceptance commands execute code with process privileges. Docker mode provides a separate constrained check environment and is mandatory for Search and MCP-started tasks. Actual isolation probes pass; they are bounded tests, not a containment audit. Use trusted task manifests and images. API credentials are not forwarded to checks; raw logs and artifacts can still contain sensitive source or output.
 
 Success means the declared checks passed on the recorded files. It does not guarantee a correct solution beyond those checks. Patches are returned for review and are not automatically applied to the source repository.
 

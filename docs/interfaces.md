@@ -29,6 +29,12 @@ Adjust absolute paths and executable location for your machine/client. Tools: `l
 
 The workspace is an operator-configured capability boundary. Only declared files are copied. Task manifests and container images should be trusted. The agent cannot choose remote endpoints, mount flags, provider credentials, or arbitrary shell tools. Tiller owns the tools in its delegated run; it cannot intercept or govern unrelated tools used by the host agent. [Official SDK](https://github.com/modelcontextprotocol/typescript-sdk).
 
+## VS Code
+
+The local extension in [integrations/vscode](../integrations/vscode/README.md) provides a Tiller Runs view with persisted events, inspection, patch preview and explicit cancellation. It invokes a restricted CLI command set in a trusted workspace. Build Tiller, package/install the VSIX using the extension's instructions, and set `tiller.cliPath` when inspecting another repository. It does not intercept the editor's other agent tools. Its backend has an actual CLI integration test; interactive developer pilots remain a release gate.
+
+Use `--ollama-think false` to request thinking off, including the MCP command's arguments if desired. Some templates still emit a leading thinking block; the adapter accepts a closed prefix followed by strict decision JSON and counts all output tokens. Resume with the same configuration because it is part of the adapter identity.
+
 ## Sensitive data
 
 Best-effort masking covers common provider-token patterns, bearer tokens, credential assignments and signed URL parameters in dashboard/MCP views. It is not a complete secret scanner. Raw SQLite events, snapshots, scripts, patches and local reports can contain source or secrets. They remain local and ignored by Git. Do not put secrets in task inputs. Limit access to `.tiller`, review artifacts before sharing, and delete local run data only after stopping workers and preserving needed artifacts. API credentials are not passed to check containers or local check processes.

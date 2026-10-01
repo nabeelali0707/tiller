@@ -5,5 +5,5 @@
   "files": ["add.cjs", "add.test.cjs"],
   "editable": ["add.cjs"],
   "checks": [{ "id": "addition", "command": "node", "args": ["add.test.cjs"], "timeoutMs": 15000 }],
-  "budget": { "maxModelCalls": 12, "maxToolCalls": 20, "maxDurationMs": 600000, "maxOutputTokensPerCall": 4096 }
+  "budget": { "maxModelCalls": 12, "maxToolCalls": 20, "maxDurationMs": 1800000, "maxOutputTokensPerCall": 4096 }
 }
