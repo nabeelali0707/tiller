@@ -71,4 +71,4 @@ tests/             transition, crash, budget, isolation scenarios
 eval/              fixtures, manifests, baselines, reports
 ```
 
-Next engineering work: validate the live adapter with user-configured credentials on the fixture, establish the sandbox boundary for larger/untrusted tasks, and add milestone 2's Hierarchical executor and comparable baselines. The scripted fixture is an engineering demonstration, not an efficacy result.
+Sequential, Hierarchical, the two reactive baselines, and a single-fixture comparison harness are implemented. Next engineering work: validate the selected local Ollama model on the fixture, add representative held-out tasks, and establish the sandbox boundary before larger/untrusted tasks. The scripted fixture is an engineering demonstration, not an efficacy result.

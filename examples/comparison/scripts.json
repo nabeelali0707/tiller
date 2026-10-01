@@ -1,0 +1,6 @@
+{
+  "flat-react": "flat.json",
+  "plan-react": "plan.json",
+  "sequential": "../repair/script.json",
+  "hierarchical": "../hierarchical/script.json"
+}

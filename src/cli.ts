@@ -10,6 +10,8 @@ import { OpenAIAdapter } from './adapters/openai.js';
 import { OllamaAdapter } from './adapters/ollama.js';
 import { createRun, execute, reconcileRun } from './executors/runtime.js';
 import { patchText } from './tools/workspace.js';
+import { compare, strategies } from './eval/compare.js';
+import type { Strategy } from './eval/compare.js';
 
 const help = `Tiller - local agent execution runtime (Node 24.14+)
 
@@ -24,6 +26,9 @@ const help = `Tiller - local agent execution runtime (Node 24.14+)
   unlock <run-id> --confirm-owner-stopped
                            Remove a stale lock only when its PID is no longer alive
   validate <task.json>      Validate a task manifest without executing commands
+  compare <task.json>       Compare strategies with identical inputs/tools/budget caps
+                           --strategies flat-react,plan-react,sequential,hierarchical --repeats 1
+                           Use provider/model options or --scripts <strategy-to-script JSON>
 
 Options: --data-dir <path> (default .tiller in current directory), --help
 Local models: --provider ollama --model <installed-model> [--ollama-url http://127.0.0.1:11434]
@@ -51,6 +56,7 @@ function report(store: Store, run: Run) {
       inputTokens: run.inputTokens, outputTokens: run.outputTokens, unknownUsageCalls: run.unknownUsageCalls },
     planVersion: run.planVersion, remainingPlan: run.remainingPlan, pending: run.pending,
     observations: run.observations, hashes: run.hashes, strategy: run.task.strategy ?? 'sequential', hierarchy: run.hierarchy ?? null,
+    declaredPlan: run.declaredPlan ?? null,
     artifacts: run.status === 'succeeded' ? ['changes.patch', 'changes.json'].map((p) => join(store.directory(run.id), p)) : [],
   };
 }
@@ -59,14 +65,18 @@ async function main(): Promise<void> {
   const { values, positionals } = parseArgs({ allowPositionals: true, strict: true, options: {
     help: { type: 'boolean' }, script: { type: 'string' }, model: { type: 'string' },
     provider: { type: 'string' }, 'ollama-url': { type: 'string' },
+    strategies: { type: 'string' }, repeats: { type: 'string' }, scripts: { type: 'string' },
     'data-dir': { type: 'string' }, 'accept-workspace': { type: 'boolean' }, 'confirm-owner-stopped': { type: 'boolean' },
   } });
   if (values.help || positionals.length === 0) { console.log(help); return; }
   const [command, target] = positionals;
   if (positionals.length !== 2 || !target) throw new Error('Expected a command and task file/run ID; see --help');
-  if (!['run', 'resume', 'inspect', 'trace', 'diff', 'cancel', 'reconcile', 'unlock', 'validate'].includes(command!))
+  if (!['run', 'resume', 'inspect', 'trace', 'diff', 'cancel', 'reconcile', 'unlock', 'validate', 'compare'].includes(command!))
     throw new Error(`Unknown command: ${command}`);
-  if ((values.script || values.model || values.provider || values['ollama-url']) && !['run', 'resume'].includes(command!)) throw new Error('Adapter options only apply to run/resume');
+  if ((values.script || values.model || values.provider || values['ollama-url']) && !['run', 'resume', 'compare'].includes(command!)) throw new Error('Adapter options only apply to run/resume/compare');
+  if ((values.strategies || values.repeats || values.scripts) && command !== 'compare') throw new Error('Comparison options only apply to compare');
+  if (command === 'compare' && values.script) throw new Error('Use --scripts for per-strategy comparison fixtures');
+  if (values.scripts && (values.model || values.provider || values['ollama-url'])) throw new Error('Use either --scripts or provider options');
   if (values['accept-workspace'] && command !== 'reconcile') throw new Error('--accept-workspace is only valid for reconcile');
   if (values['confirm-owner-stopped'] && command !== 'unlock') throw new Error('--confirm-owner-stopped is only valid for unlock');
   const loadTask = () => {
@@ -77,7 +87,32 @@ async function main(): Promise<void> {
   if (command === 'validate') { console.log(JSON.stringify(loadTask(), null, 2)); return; }
   const store = new Store(values['data-dir'] ?? '.tiller');
   try {
-    if (command === 'run' || command === 'resume') {
+    if (command === 'compare') {
+      const conditions = (values.strategies?.split(',') ?? strategies) as Strategy[];
+      const repeats = Number(values.repeats ?? '1');
+      let getAdapter: (strategy: Strategy) => Adapter;
+      if (values.scripts) {
+        const file = resolve(values.scripts);
+        const mapping: unknown = JSON.parse(readFileSync(file, 'utf8'));
+        if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) throw new Error('Expected strategy-to-script JSON object');
+        getAdapter = (strategy) => {
+          const path = (mapping as Record<string, unknown>)[strategy];
+          if (typeof path !== 'string') throw new Error(`Missing script for ${strategy}`);
+          return ScriptedAdapter.fromFile(resolve(dirname(file), path));
+        };
+      } else {
+        const adapter = adapterFor(undefined, values.model, values.provider, values['ollama-url']);
+        getAdapter = () => adapter;
+      }
+      const controller = new AbortController();
+      const pause = () => controller.abort();
+      process.on('SIGINT', pause); process.on('SIGTERM', pause);
+      try {
+        const result = await compare(store, loadTask(), conditions, repeats, getAdapter, controller.signal);
+        console.log(JSON.stringify({ path: result.path, status: result.report.status, error: result.report.error, rows: result.report.rows }, null, 2));
+        process.exitCode = result.report.status === 'completed' ? 0 : 2;
+      } finally { process.off('SIGINT', pause); process.off('SIGTERM', pause); }
+    } else if (command === 'run' || command === 'resume') {
       const adapter = adapterFor(values.script, values.model, values.provider, values['ollama-url']);
       const run = command === 'run' ? createRun(store, loadTask(), adapter) : store.load(target);
       console.error(`Run ${run.id}\nWorkspace: ${join(store.directory(run.id), 'workspace')}`);

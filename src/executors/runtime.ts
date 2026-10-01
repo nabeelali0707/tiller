@@ -108,7 +108,7 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
       ensureActive();
       return result;
     };
-    const tool = async (action: Exclude<Action, { type: 'complete' | 'decompose' }>) => {
+    const tool = async (action: Exclude<Action, { type: 'complete' | 'decompose' | 'plan' }>) => {
       if (action.type === 'check') {
         const definition = run.task.checks.find((c) => c.id === action.checkId);
         if (!definition) throw new Error(`Unknown check: ${action.checkId}`);
@@ -188,6 +188,18 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
           observe(run, 'invalid_decision', { error: message });
           store.save(run, 'decision.rejected', { message, nodeId: decision.nodeId ?? null });
         };
+        if (decision.action.type === 'plan') {
+          if (run.task.strategy !== 'plan-react' || run.declaredPlan) {
+            reject('An initial plan is permitted only once for Plan+ReAct'); continue;
+          }
+          run.declaredPlan = decision.action.steps;
+          run.decisionIndex++; run.planVersion++;
+          store.save(run, 'plan.declared', { steps: run.declaredPlan, enforcement: 'context-only' });
+          continue;
+        }
+        if (run.task.strategy === 'plan-react' && !run.declaredPlan) {
+          reject('Declare an initial plan with action.type plan before acting'); continue;
+        }
         if (decision.action.type === 'decompose') {
           if (run.task.strategy !== 'hierarchical' || run.hierarchy) {
             reject('Decomposition is allowed only once at the start of a Hierarchical run'); continue;
@@ -201,6 +213,9 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
         if (run.task.strategy === 'hierarchical' && !run.hierarchy) {
           reject('First propose a bounded hierarchy with action.type decompose'); continue;
         }
+        if ((run.task.strategy === 'sequential' || run.task.strategy === 'hierarchical' || !run.task.strategy) && decision.remainingPlan.length === 0) {
+          reject('Sequential/Hierarchical worker decisions require a nonempty remainingPlan'); continue;
+        }
         if (run.hierarchy && decision.nodeId !== run.hierarchy.activeId) {
           reject(`Only the runtime-dispatched node ${run.hierarchy.activeId} may act; include its nodeId`); continue;
         }
@@ -211,9 +226,9 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
           }
         }
         run.decisionIndex++;
-        run.planVersion++;
-        run.remainingPlan = decision.remainingPlan;
-        store.save(run, 'plan.revised', { version: run.planVersion, ...decision, provenance: 'model-proposed' });
+        const reactive = run.task.strategy === 'flat-react' || run.task.strategy === 'plan-react';
+        if (!reactive) { run.planVersion++; run.remainingPlan = decision.remainingPlan; }
+        store.save(run, reactive ? 'action.proposed' : 'plan.revised', { version: run.planVersion, ...decision, provenance: 'model-proposed' });
         if (decision.action.type !== 'complete') {
           await tool(decision.action);
           continue;

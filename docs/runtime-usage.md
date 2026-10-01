@@ -23,6 +23,20 @@ npm run tiller -- run examples/hierarchical/task.json --script examples/hierarch
 
 All strategies share the same tool gateway, persistence, integrity checks, cancellation, and budgets. Decomposition and leaf verification consume that common budget. There are no concurrent workers or sandbox claims.
 
+## Reactive baselines and comparison
+
+The task's `strategy` also accepts `flat-react` and `plan-react`. Flat ReAct chooses one action from current observations without an explicit plan. Plan ReAct first declares `action: {"type":"plan","steps":[...]}`; the initial plan stays in context but does not dispatch or gate later work. Both share the same tools and final acceptance checks as the enforced strategies. Sequential revises its remaining plan on each worker decision; Hierarchical dispatches leaves and requires their evidence.
+
+```sh
+npm run tiller -- compare examples/repair/task.json --scripts examples/comparison/scripts.json
+# After the local model finishes downloading:
+npm run tiller -- compare examples/repair/task.json --provider ollama --model lfm2.5:8b --repeats 2
+```
+
+Use `--strategies flat-react,sequential` to select conditions. Repeats must be 1-10; condition order rotates each repeat. Every run gets a fresh copied workspace and the same configured budget caps. Planning and additional leaf checks consume those caps. Different strategies can consume different actual resources. Changed source inputs interrupt the comparison.
+
+Reports are saved to `.tiller/comparisons/<comparison-id>/report.json` after each run, including run IDs, acceptance outcomes, token counts, unknown usage, and elapsed time. Ctrl+C preserves a partial report. A completed comparison exits 0 even when individual runs fail; an interrupted comparison exits 2. This is a single visible-check fixture harness, not a benchmark, hidden-test evaluation, or evidence of general strategy superiority. Scripted decisions test runtime behavior only.
+
 ## Setup and offline example
 
 Use Node 24.14+ and npm. Node 24 may print an experimental warning for its built-in SQLite API. SQLite uses WAL mode and full synchronous writes. Run data belong on a local filesystem, not a shared network drive.

@@ -4,7 +4,7 @@ Keep your agent on course.
 
 Tiller is a local execution runtime for AI coding agents: explicit execution strategies, observable tool activity, verified outcomes, and bounded recovery.
 
-**Status: early execution runtime prototype.** Sequential and Hierarchical execution, CLI, SQLite traces, copied workspaces, budget limits, acceptance checks, interruption recovery, scripted/Ollama/OpenAI adapters are implemented. Search, dynamic routing, MCP, and the editor integration remain planned. No agent-performance benchmark results are claimed.
+**Status: early execution runtime prototype.** Sequential and Hierarchical execution, reactive baselines, a strategy-comparison harness, CLI, SQLite traces, copied workspaces, budget limits, acceptance checks, interruption recovery, scripted/Ollama/OpenAI adapters are implemented. Search, dynamic routing, MCP, and the editor integration remain planned. No agent-performance benchmark results are claimed.
 
 ## Try it
 
@@ -36,7 +36,7 @@ You can also run an already-installed local Ollama model without an API key:
 ```sh
 ollama serve
 # In another terminal, after npm run build:
-npm run tiller -- run examples/repair/task.json --provider ollama --model llama3.2:3b
+npm run tiller -- run examples/repair/task.json --provider ollama --model lfm2.5:8b
 ```
 
 Use `ollama list` to choose a model installed on your machine. Tiller does not download models. Its Ollama adapter accepts only loopback IP endpoints and rejects cloud model tags.
@@ -49,7 +49,15 @@ npm run tiller -- run examples/hierarchical/task.json --script examples/hierarch
 
 The runtime dispatches an investigation leaf, requires actual file-read evidence, then dispatches its dependent repair leaf and checks the result before aggregating the parent. All task checks run again before final success.
 
-Live runs send the task and observed file/check content to OpenAI. Do not include secrets in the declared inputs. The adapter has mocked HTTP contract tests; a paid live request has not been tested in this workspace because no API key was configured.
+Compare the four implemented strategies with deterministic fixtures:
+
+```sh
+npm run tiller -- compare examples/repair/task.json --scripts examples/comparison/scripts.json
+```
+
+Each condition gets a fresh workspace with the same inputs, checks, and budget caps. The JSON report records outcomes, resource use, latency, and links to run traces. Scripted results validate execution paths; they do not measure model performance.
+
+OpenAI runs send the task and observed file/check content to OpenAI; Ollama runs send it to the configured local server. Do not include secrets in the declared inputs. The adapters have mocked HTTP contract tests; a paid live request has not been tested in this workspace because no API key was configured.
 
 See [runtime usage](docs/runtime-usage.md) for task manifests, limits, cancellation, and recovery.
 

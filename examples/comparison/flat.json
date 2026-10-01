@@ -1,0 +1,5 @@
+[
+  { "reason": "Inspect the failing implementation", "action": { "type": "read", "path": "add.cjs" } },
+  { "reason": "Replace subtraction with addition", "action": { "type": "write", "path": "add.cjs", "content": "exports.add = (a, b) => a + b;\n" } },
+  { "reason": "Ready for verification", "action": { "type": "complete", "summary": "Fixed addition." } }
+]
