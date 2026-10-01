@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "goal": "Fix add.cjs so add(a, b) returns the numeric sum. Preserve the existing CommonJS export and pass the regression checks.",
+  "repository": "../repair/repo",
+  "files": ["add.cjs", "add.test.cjs"],
+  "editable": ["add.cjs"],
+  "checks": [{ "id": "addition", "command": "node", "args": ["add.test.cjs"], "timeoutMs": 15000 }],
+  "budget": { "maxModelCalls": 12, "maxToolCalls": 20, "maxDurationMs": 600000, "maxOutputTokensPerCall": 4096 }
+}

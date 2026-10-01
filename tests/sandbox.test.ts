@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sandboxArgs, prepareSandbox, sandboxCheck } from '../src/tools/sandbox.js';
@@ -21,6 +21,9 @@ test('real Docker denies host mutations, network access and secrets, and cleans 
   { skip: process.env.TILLER_DOCKER_TESTS !== '1' }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tiller-sandbox-'));
     try {
+      // mkdtemp is 0700 on Linux; this disposable probe directory contains no private data.
+      // The unprivileged container user needs directory read/traverse permission.
+      if (process.platform !== 'win32') chmodSync(dir, 0o755);
       const image = await prepareSandbox('node:24-alpine');
       writeFileSync(join(dir, 'sentinel'), 'original');
       writeFileSync(join(dir, 'probe.cjs'), `const fs=require('node:fs'); const assert=require('node:assert/strict');
