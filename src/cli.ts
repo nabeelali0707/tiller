@@ -13,6 +13,7 @@ import { patchText } from './tools/workspace.js';
 import { compare, strategies } from './eval/compare.js';
 import type { Strategy } from './eval/compare.js';
 import { evaluateSuite } from './eval/suite.js';
+import { doctor } from './tools/doctor.js';
 
 const help = `Tiller - local agent execution runtime (Node 24.14+)
 
@@ -32,6 +33,9 @@ const help = `Tiller - local agent execution runtime (Node 24.14+)
                            Use provider/model options or --scripts <strategy-to-script JSON>
   evaluate <suite.json>     Run comparisons across a task suite; use --scripted for fixtures
                            Accepts --strategies, --repeats and provider/model options
+  doctor                   Check Node, selected local model and Docker sandbox prerequisites
+  dashboard                Open a loopback dashboard; --port defaults to a free port
+  mcp                      Serve MCP over stdio; --workspace scopes Docker tasks
 
 Options: --data-dir <path> (default .tiller in current directory), --help
 Local models: --provider ollama --model <installed-model> [--ollama-url http://127.0.0.1:11434]
@@ -52,7 +56,8 @@ function adapterFor(script?: string, model?: string, provider?: string, ollamaUr
 
 function report(store: Store, run: Run) {
   return { id: run.id, status: run.status, message: run.message, adapter: run.adapter,
-    workspace: join(store.directory(run.id), 'workspace'), executionMode: 'trusted-local',
+    workspace: join(store.directory(run.id), 'workspace'), executionMode: run.task.execution?.mode ?? 'trusted-local',
+    dockerImage: run.dockerImage ?? null,
     cancellationRequested: store.cancelled(run.id),
     deadline: run.deadline === null ? null : new Date(run.deadline).toISOString(),
     budget: run.task.budget, spent: { modelCalls: run.calls, toolCalls: run.tools,
@@ -70,10 +75,40 @@ async function main(): Promise<void> {
     provider: { type: 'string' }, 'ollama-url': { type: 'string' },
     strategies: { type: 'string' }, repeats: { type: 'string' }, scripts: { type: 'string' },
     scripted: { type: 'boolean' },
+    port: { type: 'string' }, workspace: { type: 'string' },
     'data-dir': { type: 'string' }, 'accept-workspace': { type: 'boolean' }, 'confirm-owner-stopped': { type: 'boolean' },
   } });
   if (values.help || positionals.length === 0) { console.log(help); return; }
   const [command, target] = positionals;
+  if (['doctor', 'dashboard', 'mcp'].includes(command!)) {
+    if (positionals.length !== 1) throw new Error('This command takes no positional target');
+    if (values.script || values.scripts || values.scripted || values.strategies || values.repeats || values['accept-workspace'] || values['confirm-owner-stopped']) throw new Error('Run/comparison options do not apply to this command');
+    if (command === 'doctor') { console.log(JSON.stringify(await doctor(values.model ?? process.env.TILLER_MODEL), null, 2)); return; }
+    const store = new Store(values['data-dir'] ?? '.tiller');
+    try {
+      if (command === 'dashboard') {
+        const port = Number(values.port ?? '0'); if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be 0-65535');
+        const { startDashboard } = await import('./interfaces/dashboard.js');
+        const result = await startDashboard(store, port); console.log(`Tiller dashboard: ${result.url}`);
+        await new Promise<void>((done) => {
+          const stop = () => result.server.close(() => done());
+          process.once('SIGINT', stop); process.once('SIGTERM', stop);
+        });
+      } else {
+        const { StdioServerTransport } = await import('@modelcontextprotocol/server/stdio');
+        const { createMcp } = await import('./interfaces/mcp.js');
+        const mcp = createMcp(store, resolve(values.workspace ?? '.'), values.model ?? process.env.TILLER_MODEL ?? 'lfm2.5:8b');
+        await mcp.server.connect(new StdioServerTransport());
+        await new Promise<void>((done) => {
+          let stopping = false;
+          const stop = () => { if (stopping) return; stopping = true; void mcp.stop().then(() => mcp.server.close()).finally(done); };
+          process.once('SIGINT', stop); process.once('SIGTERM', stop); process.stdin.once('end', stop);
+        });
+      }
+    } finally { store.close(); }
+    return;
+  }
+  if (values.port || values.workspace) throw new Error('--port/--workspace apply to dashboard/MCP only');
   if (positionals.length !== 2 || !target) throw new Error('Expected a command and task file/run ID; see --help');
   if (!['run', 'resume', 'inspect', 'trace', 'diff', 'cancel', 'reconcile', 'unlock', 'validate', 'compare', 'evaluate'].includes(command!))
     throw new Error(`Unknown command: ${command}`);

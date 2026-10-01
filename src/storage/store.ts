@@ -43,6 +43,11 @@ export class Store {
     return this.db.prepare('SELECT seq,at,type,data FROM events WHERE run_id=? ORDER BY seq').all(id)
       .map((r) => ({ seq: r.seq as number, at: r.at as number, type: r.type as string, data: JSON.parse(r.data as string) as unknown }));
   }
+  list(limit = 100): Run[] {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('List limit must be 1-100');
+    return this.db.prepare('SELECT state FROM runs ORDER BY rowid DESC LIMIT ?').all(limit)
+      .map((row) => JSON.parse(row.state as string) as Run);
+  }
   cancel(id: string): void {
     this.load(id);
     this.db.prepare('UPDATE runs SET cancel=1 WHERE id=?').run(id);
