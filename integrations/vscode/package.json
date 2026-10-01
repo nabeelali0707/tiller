@@ -1,0 +1,36 @@
+{
+  "name": "tiller-timeline",
+  "displayName": "Tiller Execution Timeline",
+  "description": "Inspect Tiller's real execution events and verified patch previews inside VS Code.",
+  "version": "0.2.0",
+  "publisher": "nabeelali0707",
+  "license": "UNLICENSED",
+  "repository": { "type": "git", "url": "https://github.com/nabeelali0707/tiller.git" },
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "main": "./extension.cjs",
+  "files": ["extension.cjs", "backend.cjs", "README.md"],
+  "capabilities": { "untrustedWorkspaces": { "supported": false }, "virtualWorkspaces": false },
+  "contributes": {
+    "views": { "explorer": [{ "id": "tiller.runs", "name": "Tiller Runs" }] },
+    "commands": [
+      { "command": "tiller.refresh", "title": "Tiller: Refresh Runs" },
+      { "command": "tiller.inspect", "title": "Tiller: Inspect Run" },
+      { "command": "tiller.patch", "title": "Tiller: Preview Patch" },
+      { "command": "tiller.cancel", "title": "Tiller: Request Cancellation" }
+    ],
+    "menus": {
+      "view/title": [{ "command": "tiller.refresh", "when": "view == tiller.runs", "group": "navigation" }],
+      "view/item/context": [
+        { "command": "tiller.inspect", "when": "view == tiller.runs && viewItem == tillerRun" },
+        { "command": "tiller.patch", "when": "view == tiller.runs && viewItem == tillerRun" },
+        { "command": "tiller.cancel", "when": "view == tiller.runs && viewItem == tillerRun" }
+      ]
+    },
+    "configuration": { "title": "Tiller", "properties": {
+      "tiller.cliPath": { "type": "string", "default": "", "scope": "machine", "description": "Absolute path to Tiller's built dist/src/cli.js. Defaults to the selected workspace's dist/src/cli.js." },
+      "tiller.nodePath": { "type": "string", "default": "node", "scope": "machine", "description": "Node.js 24.14+ executable." },
+      "tiller.dataDirectory": { "type": "string", "default": ".tiller", "description": "Run data directory relative to the selected workspace, or an absolute path." }
+    } }
+  }
+}
