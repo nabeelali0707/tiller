@@ -70,7 +70,15 @@ export class OllamaAdapter implements Adapter {
     const body = parsed.data;
     let decision: unknown = null;
     if (body.done && body.done_reason !== 'length') {
-      try { decision = JSON.parse(body.message.content); } catch { /* charged, then rejected by runtime */ }
+      // Some local model templates return a leading thinking wrapper in content
+      // even when think=false. Accept only a closed prefix and strict final JSON;
+      // never extract a JSON-looking substring from arbitrary model commentary.
+      let content = body.message.content.trim();
+      if (content.startsWith('<think>')) {
+        const end = content.indexOf('</think>', 7);
+        content = end < 0 ? '' : content.slice(end + 8).trim();
+      }
+      try { decision = JSON.parse(content); } catch { /* charged, then rejected by runtime */ }
     }
     const usage = body.prompt_eval_count !== undefined && body.eval_count !== undefined ?
       { inputTokens: body.prompt_eval_count, outputTokens: body.eval_count } : undefined;

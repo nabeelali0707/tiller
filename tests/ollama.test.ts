@@ -53,3 +53,19 @@ test('explicit thinking configuration is sent and preserved in adapter identity'
   assert.match(adapter.id, /think=false$/);
   await adapter.next(run, new AbortController().signal);
 });
+
+test('local thinking prefix is excluded from decisions without accepting arbitrary commentary', async () => {
+  for (const [content, accepted] of [
+    [`<think>Internal model text</think>\n${JSON.stringify(decision)}`, true],
+    [`<think>unclosed ${JSON.stringify(decision)}`, false],
+    [`Some commentary ${JSON.stringify(decision)}`, false],
+    [`<think>closed</think>${JSON.stringify(decision)} extra commentary`, false],
+  ] as const) {
+    const adapter = new OllamaAdapter('local', undefined, async () => Response.json({
+      done: true, message: { content }, prompt_eval_count: 5, eval_count: 20,
+    }));
+    const result = await adapter.next(run, new AbortController().signal);
+    assert.deepEqual(result.decision, accepted ? decision : null);
+    assert.equal(result.usage?.outputTokens, 20);
+  }
+});
