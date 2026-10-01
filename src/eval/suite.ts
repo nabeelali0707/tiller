@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { taskSchema } from '../core/contracts.js';
 import type { Adapter } from '../core/contracts.js';
 import { Store } from '../storage/store.js';
-import { compare, strategies } from './compare.js';
+import { compare, supportedStrategies } from './compare.js';
 import type { ComparisonReport, Strategy } from './compare.js';
 
 export const suiteSchema = z.object({
@@ -14,7 +14,7 @@ export const suiteSchema = z.object({
   cases: z.array(z.object({
     id: z.string().regex(/^[a-zA-Z0-9_-]+$/).max(80),
     task: z.string().min(1),
-    scripts: z.partialRecord(z.enum(strategies as [Strategy, ...Strategy[]]), z.string().min(1)).optional(),
+    scripts: z.partialRecord(z.enum(supportedStrategies as [Strategy, ...Strategy[]]), z.string().min(1)).optional(),
   }).strict()).min(1).max(20),
 }).strict().refine((suite) => new Set(suite.cases.map((c) => c.id.toLowerCase())).size === suite.cases.length,
   'Case IDs must be unique (case-insensitive)');
@@ -31,7 +31,7 @@ export async function evaluateSuite(store: Store, file: string, conditions: Stra
   adapterFor: (strategy: Strategy, script: string | undefined) => Adapter,
   useScripts: boolean, signal?: AbortSignal): Promise<{ path: string; report: SuiteReport }> {
   if (!Number.isInteger(repeats) || repeats < 1 || repeats > 10) throw new Error('Repeats must be an integer from 1 to 10');
-  if (!conditions.length || new Set(conditions).size !== conditions.length || conditions.some((c) => !strategies.includes(c)))
+  if (!conditions.length || new Set(conditions).size !== conditions.length || conditions.some((c) => !supportedStrategies.includes(c)))
     throw new Error('Choose unique supported strategies');
   const base = dirname(resolve(file));
   const suite = suiteSchema.parse(JSON.parse(readFileSync(file, 'utf8')) as unknown);
@@ -40,6 +40,7 @@ export async function evaluateSuite(store: Store, file: string, conditions: Stra
     const taskFile = resolve(base, entry.task);
     const parsed = taskSchema.parse(JSON.parse(readFileSync(taskFile, 'utf8')) as unknown);
     const task = { ...parsed, repository: resolve(dirname(taskFile), parsed.repository) };
+    if (conditions.includes('search') && task.execution?.mode !== 'docker') throw new Error(`Search requires Docker execution for case ${entry.id}`);
     const adapters = new Map(conditions.map((strategy) => {
       const script = entry.scripts?.[strategy];
       if (useScripts && !script) throw new Error(`Missing script for ${entry.id}/${strategy}`);

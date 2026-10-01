@@ -7,6 +7,7 @@ import { Store } from '../storage/store.js';
 
 export type Strategy = Task['strategy'];
 export const strategies: Strategy[] = ['flat-react', 'plan-react', 'sequential', 'hierarchical'];
+export const supportedStrategies: Strategy[] = [...strategies, 'search'];
 export interface ComparisonRow {
   strategy: Strategy; repeat: number; runId: string; adapter: string; outcome: Status;
   accepted: boolean; modelCalls: number; toolCalls: number; inputTokens: number;
@@ -22,10 +23,11 @@ export interface ComparisonReport {
 export async function compare(store: Store, task: Task, conditions: Strategy[], repeats: number,
   adapterFor: (strategy: Strategy) => Adapter, signal?: AbortSignal): Promise<{ path: string; report: ComparisonReport }> {
   if (!Number.isInteger(repeats) || repeats < 1 || repeats > 10) throw new Error('Repeats must be an integer from 1 to 10');
-  if (!conditions.length || new Set(conditions).size !== conditions.length || conditions.some((c) => !strategies.includes(c)))
+  if (!conditions.length || new Set(conditions).size !== conditions.length || conditions.some((c) => !supportedStrategies.includes(c)))
     throw new Error('Choose unique supported strategies');
   // Validate all adapter configurations before any environment is executed.
   const adapters = new Map(conditions.map((condition) => [condition, adapterFor(condition)]));
+  if (conditions.includes('search') && task.execution?.mode !== 'docker') throw new Error('Search comparison requires Docker execution for all conditions');
   const id = randomUUID();
   const dir = join(store.root, 'comparisons', id); mkdirSync(dir, { recursive: true });
   const path = join(dir, 'report.json');

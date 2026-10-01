@@ -9,6 +9,9 @@ import { runCheck } from '../tools/checks.js';
 import type { CheckResult } from '../tools/checks.js';
 import { buildHierarchy, nextLeaf, completeLeaf, invalidateChecks } from '../core/hierarchy.js';
 import { hash } from '../tools/workspace.js';
+import { sandboxServices } from '../tools/sandbox.js';
+import type { SandboxServices } from '../tools/sandbox.js';
+import { monitorResult, switchTarget, applySwitch } from '../core/routing.js';
 
 export function createRun(store: Store, task: Task, adapter: Adapter): Run {
   task = taskSchema.parse(task);
@@ -19,7 +22,7 @@ export function createRun(store: Store, task: Task, adapter: Adapter): Run {
     decisionIndex: 0, planVersion: 0, remainingPlan: [], pending: null,
     hashes: snapshot(task, store.directory(id)), baselineDone: false, observations: [], message: '',
   };
-  store.save(run, 'run.created', { executionMode: 'trusted-local', strategy: task.strategy, adapter: adapter.id, snapshot: run.hashes });
+  store.save(run, 'run.created', { executionMode: task.execution?.mode ?? 'trusted-local', strategy: task.strategy, adapter: adapter.id, snapshot: run.hashes });
   return run;
 }
 
@@ -47,7 +50,24 @@ export function reconcileRun(store: Store, id: string): Run {
   } finally { release(); }
 }
 
-export async function execute(store: Store, id: string, adapter: Adapter, externalSignal?: AbortSignal): Promise<Run> {
+export interface ExecutionAccounting {
+  reserve(kind: 'model' | 'tool'): void;
+  usage(inputTokens: number, outputTokens: number): void;
+}
+export async function execute(store: Store, id: string, adapter: Adapter, externalSignal?: AbortSignal, accounting?: ExecutionAccounting, sandbox: SandboxServices = sandboxServices): Promise<Run> {
+  if (store.load(id).task.strategy === 'search') {
+    const { executeSearch } = await import('./search.js');
+    return executeSearch(store, id, adapter, externalSignal, sandbox);
+  }
+  const result = await executeControlled(store, id, adapter, externalSignal, accounting, sandbox);
+  if (result.task.strategy === 'search' && result.status === 'running') {
+    const { executeSearch } = await import('./search.js');
+    return executeSearch(store, id, adapter, externalSignal, sandbox);
+  }
+  return result;
+}
+
+async function executeControlled(store: Store, id: string, adapter: Adapter, externalSignal?: AbortSignal, accounting?: ExecutionAccounting, sandbox: SandboxServices = sandboxServices): Promise<Run> {
   const release = store.lock(id);
   let timer: NodeJS.Timeout | undefined;
   let deadlineTimer: NodeJS.Timeout | undefined;
@@ -94,14 +114,18 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
       const pending = run.pending;
       run.pending = null;
       observe(run, kind, result);
+      monitorResult(run, kind, result);
       store.save(run, 'operation.completed', { operation: pending, result, hashes: run.hashes, provenance: 'runtime-observed' });
     };
     const check = async (definition: Task['checks'][number], final: boolean): Promise<CheckResult> => {
       ensureActive(); assertCheckpoint(run, workspace); assertProtected(run, directory);
       reserve(run, 'tool', 1, final);
+      accounting?.reserve('tool');
       run.pending = { id: randomUUID(), kind: 'check', nodeId: final ? null : run.hierarchy?.activeId ?? null, detail: { checkId: definition.id, final } };
       store.save(run, 'operation.started', run.pending);
-      const result = await runCheck(definition, workspace, controller.signal, run.deadline! - Date.now());
+      const result = run.task.execution?.mode === 'docker'
+        ? await sandbox.check(definition, workspace, run.dockerImage!, controller.signal, run.deadline! - Date.now(), run.pending.id)
+        : await runCheck(definition, workspace, controller.signal, run.deadline! - Date.now());
       // Acceptance commands may execute code, but changing declared files invalidates the checkpoint.
       assertCheckpoint(run, workspace);
       persistResult('check', result);
@@ -116,6 +140,7 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
       }
       ensureActive(); assertCheckpoint(run, workspace); assertProtected(run, directory);
       reserve(run, 'tool');
+      accounting?.reserve('tool');
       run.pending = { id: randomUUID(), kind: action.type, nodeId: run.hierarchy?.activeId ?? null, detail: action };
       store.save(run, 'operation.started', run.pending);
       let result: unknown;
@@ -139,6 +164,12 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
 
     try {
       ensureActive();
+      if (run.task.execution?.mode === 'docker') {
+        const image = await sandbox.prepare(run.dockerImage ?? run.task.execution.image);
+        run.dockerImage = image;
+        store.save(run, 'sandbox.prepared', { image, mode: 'docker' });
+        ensureActive();
+      }
       if (!run.baselineDone) {
         for (const definition of run.task.checks) await check(definition, false);
         run.baselineDone = true;
@@ -146,6 +177,12 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
       }
       while (true) {
         ensureActive(); assertCheckpoint(run, workspace); assertProtected(run, directory);
+        const target = switchTarget(run);
+        if (target) {
+          applySwitch(run, target);
+          store.save(run, 'strategy.switched', { segment: run.segments!.at(-1), policy: 'repeated-check-failure-v1' });
+          if (target === 'search') break;
+        }
         let hierarchyFinished = false;
         if (run.hierarchy) {
           const leaf = nextLeaf(run.hierarchy);
@@ -164,6 +201,7 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
         }
         if (!hierarchyFinished) {
         reserve(run, 'model');
+        accounting?.reserve('model');
         run.pending = { id: randomUUID(), kind: 'model', nodeId: run.hierarchy?.activeId ?? null, detail: { adapter: adapter.id } };
         store.save(run, 'model.started', run.pending);
         const reply = await adapter.next(structuredClone(run), controller.signal);
@@ -172,6 +210,7 @@ export async function execute(store: Store, id: string, adapter: Adapter, extern
           run.inputTokens += reply.usage.inputTokens;
           run.outputTokens += reply.usage.outputTokens;
           run.unknownUsageCalls--;
+          accounting?.usage(reply.usage.inputTokens, reply.usage.outputTokens);
         }
         run.pending = null;
         store.save(run, 'model.completed', { usage: reply.usage ?? null });

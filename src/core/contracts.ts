@@ -13,7 +13,14 @@ export const relativeFile = z.string().min(1).max(240).refine((p) =>
 export const taskSchema = z.object({
   version: z.literal(1),
   goal: z.string().min(1).max(12_000),
-  strategy: z.enum(['sequential', 'hierarchical', 'flat-react', 'plan-react']).default('sequential'),
+  strategy: z.enum(['sequential', 'hierarchical', 'flat-react', 'plan-react', 'search']).default('sequential'),
+  execution: z.object({
+    mode: z.enum(['trusted-local', 'docker']),
+    image: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$/).default('node:24-alpine'),
+  }).strict().optional(),
+  search: z.object({ candidates: z.number().int().min(2).max(3).default(2) }).strict().optional(),
+  routing: z.object({ enabled: z.boolean(), failureThreshold: z.number().int().min(2).max(10).default(2),
+    maxSwitches: z.number().int().min(1).max(2).default(2), cooldownOperations: z.number().int().min(2).max(20).default(2) }).strict().optional(),
   repository: z.string().min(1),
   files: z.array(relativeFile).min(1).max(200),
   editable: z.array(relativeFile).min(1).max(100),
@@ -37,6 +44,10 @@ export const taskSchema = z.object({
     ctx.addIssue({ code: 'custom', message: 'Editable files must be explicitly included in files' });
   if (t.budget.maxToolCalls < 2 * t.checks.length)
     ctx.addIssue({ code: 'custom', message: 'Tool budget must cover baseline and final verification' });
+  if (t.execution?.mode === 'docker' && t.checks.some((c) => c.command !== 'node'))
+    ctx.addIssue({ code: 'custom', message: 'Docker checks currently support node commands only' });
+  if (t.strategy === 'search' && t.execution?.mode !== 'docker')
+    ctx.addIssue({ code: 'custom', message: 'Search requires Docker sandbox execution' });
 });
 export type Task = z.infer<typeof taskSchema>;
 
@@ -80,6 +91,10 @@ export interface Run {
   message: string;
   hierarchy?: Hierarchy;
   declaredPlan?: string[];
+  dockerImage?: string;
+  searchState?: { entryHashes: Record<string, string>; candidates: string[]; winner?: string; phase: 'candidates' | 'promotion' | 'verification' };
+  monitor?: { failures: number; operations: number; lastSwitchOperation: number; lastFailure: string | null };
+  segments?: { generation: number; strategy: Task['strategy']; reason: string; calls: number; tools: number; hashes: Record<string, string>; hierarchy?: Hierarchy }[];
 }
 export interface AdapterReply { decision: unknown; usage?: { inputTokens: number; outputTokens: number } }
 export interface Adapter {

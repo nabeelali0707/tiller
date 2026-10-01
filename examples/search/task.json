@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "goal": "Repair add.cjs so add(a,b) returns the numeric sum; preserve the CommonJS export.",
+  "strategy": "search",
+  "execution": { "mode": "docker", "image": "node:24-alpine" },
+  "search": { "candidates": 2 },
+  "repository": "../repair/repo",
+  "files": ["add.cjs", "add.test.cjs"],
+  "editable": ["add.cjs"],
+  "checks": [{ "id": "addition", "command": "node", "args": ["add.test.cjs"], "timeoutMs": 15000 }],
+  "budget": { "maxModelCalls": 16, "maxToolCalls": 24, "maxDurationMs": 1800000, "maxOutputTokensPerCall": 4096 }
+}
