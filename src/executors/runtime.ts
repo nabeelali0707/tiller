@@ -221,8 +221,9 @@ async function executeControlled(store: Store, id: string, adapter: Adapter, ext
         ensureActive();
         const parsed = decisionSchema.safeParse(reply.decision);
         if (!parsed.success) {
-          observe(run, 'invalid_decision', { error: 'Decision failed schema validation. Return exactly the documented JSON shape.' });
-          store.save(run, 'decision.rejected', { issues: parsed.error.issues.map((issue) => ({ path: issue.path, message: issue.message })) });
+          const issues = parsed.error.issues.slice(0, 10).map((issue) => ({ path: issue.path, message: issue.message.slice(0, 300) }));
+          observe(run, 'invalid_decision', { error: 'Decision failed schema validation. Return exactly the documented JSON shape.', issues });
+          store.save(run, 'decision.rejected', { issues });
           continue;
         }
         const decision = parsed.data;

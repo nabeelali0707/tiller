@@ -140,7 +140,16 @@ test('active cancellation aborts adapter and preserves unknown charged request',
 test('malformed model output never reaches tools and consumes call budget', async () => {
   const f = fixture({ maxModelCalls: 2 });
   try {
-    const adapter: Adapter = { id: 'bad-json', next: async () => ({ decision: { action: { type: 'shell' } }, usage: { inputTokens: 5, outputTokens: 3 } }) };
+    let requests = 0;
+    const adapter: Adapter = { id: 'bad-json', next: async (state) => {
+      if (requests++ > 0) {
+        const feedback = state.observations.findLast((item) => item.type === 'invalid_decision')?.result as { issues: { path: string[]; message: string }[] };
+        assert.ok(feedback.issues.some((issue) => issue.path.includes('action')));
+        assert.ok(feedback.issues.length <= 10);
+        assert.ok(feedback.issues.every((issue) => issue.message.length <= 300));
+      }
+      return { decision: { action: { type: 'shell' } }, usage: { inputTokens: 5, outputTokens: 3 } };
+    } };
     const run = createRun(f.store, f.task, adapter);
     const result = await execute(f.store, run.id, adapter);
     assert.equal(result.status, 'budget_exhausted'); assert.equal(result.tools, 1);
