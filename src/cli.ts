@@ -14,6 +14,7 @@ import { compare, strategies } from './eval/compare.js';
 import type { Strategy } from './eval/compare.js';
 import { evaluateSuite } from './eval/suite.js';
 import { doctor } from './tools/doctor.js';
+import { loadConfig } from './config.js';
 
 const help = `Tiller - local agent execution runtime (Node 24.14+)
 
@@ -42,6 +43,7 @@ Options: --data-dir <path> (default .tiller in current directory), --help
 Local models: --provider ollama --model <installed-model> [--ollama-url http://127.0.0.1:11434]
               [--ollama-think true|false] (use the same configuration on resume)
 OpenAI: --provider openai with OPENAI_API_KEY and --model or TILLER_MODEL.
+Settings load from .env in the current directory; shell values and CLI flags take precedence.
 Checks execute local code. Use only trusted repositories/check commands.
 Workspace copies are not security sandboxes. Source files are not auto-updated.
 `;
@@ -82,6 +84,7 @@ function report(store: Store, run: Run) {
 }
 
 async function main(): Promise<void> {
+  loadConfig();
   const { values, positionals } = parseArgs({ allowPositionals: true, strict: true, options: {
     help: { type: 'boolean' }, script: { type: 'string' }, model: { type: 'string' },
     provider: { type: 'string' }, 'ollama-url': { type: 'string' },

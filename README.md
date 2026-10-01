@@ -24,12 +24,14 @@ npm run tiller -- trace <run-id>
 npm run tiller -- diff <run-id>
 ```
 
-For live use, configure `OPENAI_API_KEY` through your environment and select a compatible model using `--model` or `TILLER_MODEL`:
+For live OpenAI use, copy `.env.example` to `.env` (`Copy-Item .env.example .env` in PowerShell, or `cp .env.example .env` on macOS/Linux). Paste your key after `OPENAI_API_KEY=`. The provider and model are already configured; then run:
 
 ```sh
 npm run build
-npm run tiller -- run examples/repair/task.json --model YOUR_MODEL_ID
+npm run tiller -- run examples/repair/task.json
 ```
+
+Tiller reads `.env` from your current directory. Shell variables override the file; `--provider` and `--model` override both. The template selects [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1), which supports the Responses API. Change `TILLER_MODEL` if your account uses another compatible model. API billing and model access are required. `.env` is ignored by Git; never put real keys in `.env.example`.
 
 You can also run an already-installed local Ollama model without an API key:
 

@@ -15,7 +15,7 @@ export class OpenAIAdapter implements Adapter {
   readonly id: string;
   constructor(private model: string, private apiKey: string, private request: typeof fetch = fetch) {
     if (!model.trim()) throw new Error('Set TILLER_MODEL or supply --model');
-    if (!apiKey.trim()) throw new Error('Set OPENAI_API_KEY in your environment; do not put it in task files');
+    if (!apiKey.trim()) throw new Error('Add OPENAI_API_KEY to .env or your shell environment. Copy .env.example to .env to get started; do not put keys in task files');
     this.id = `openai-responses:${model}`;
   }
   async next(run: Readonly<Run>, signal: AbortSignal): Promise<AdapterReply> {
