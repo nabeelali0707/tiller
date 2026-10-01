@@ -2,7 +2,12 @@
   "name": "tiller-runtime",
   "version": "0.2.0",
   "license": "UNLICENSED",
-  "files": ["dist/src", "README.md", "docs", "examples"],
+  "files": [
+    "dist/src",
+    "README.md",
+    "docs",
+    "examples"
+  ],
   "description": "A local, verifiable execution runtime for coding agents",
   "type": "module",
   "engines": {
@@ -23,6 +28,7 @@
   "dependencies": {
     "@modelcontextprotocol/server": "^2.2.0",
     "diff": "^9.0.0",
+    "undici": "^8.11.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {

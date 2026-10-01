@@ -34,23 +34,33 @@ const help = `Tiller - local agent execution runtime (Node 24.14+)
   evaluate <suite.json>     Run comparisons across a task suite; use --scripted for fixtures
                            Accepts --strategies, --repeats and provider/model options
   doctor                   Check Node, selected local model and Docker sandbox prerequisites
+  list                     List recent persisted runs without executing tools
   dashboard                Open a loopback dashboard; --port defaults to a free port
   mcp                      Serve MCP over stdio; --workspace scopes Docker tasks
 
 Options: --data-dir <path> (default .tiller in current directory), --help
 Local models: --provider ollama --model <installed-model> [--ollama-url http://127.0.0.1:11434]
+              [--ollama-think true|false] (use the same configuration on resume)
 OpenAI: --provider openai with OPENAI_API_KEY and --model or TILLER_MODEL.
 Checks execute local code. Use only trusted repositories/check commands.
 Workspace copies are not security sandboxes. Source files are not auto-updated.
 `;
 
-function adapterFor(script?: string, model?: string, provider?: string, ollamaUrl?: string): Adapter {
-  if (script && (model || provider || ollamaUrl)) throw new Error('Use either --script or provider/model options');
+function thinkOption(value?: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (value !== 'true' && value !== 'false') throw new Error('--ollama-think must be true or false');
+  return value === 'true';
+}
+function adapterFor(script?: string, model?: string, provider?: string, ollamaUrl?: string, thinking?: string): Adapter {
+  if (script && (model || provider || ollamaUrl || thinking)) throw new Error('Use either --script or provider/model options');
   if (script) return ScriptedAdapter.fromFile(resolve(script));
   const selected = provider ?? process.env.TILLER_PROVIDER ?? 'openai';
-  if (selected === 'ollama') return new OllamaAdapter(model ?? process.env.TILLER_MODEL ?? '', ollamaUrl);
+  if (selected === 'ollama') {
+    const think = thinkOption(thinking);
+    return new OllamaAdapter(model ?? process.env.TILLER_MODEL ?? '', ollamaUrl, undefined, think === undefined ? {} : { think });
+  }
   if (selected !== 'openai') throw new Error('Provider must be ollama or openai');
-  if (ollamaUrl) throw new Error('--ollama-url requires --provider ollama');
+  if (ollamaUrl || thinking) throw new Error('Ollama options require --provider ollama');
   return new OpenAIAdapter(model ?? process.env.TILLER_MODEL ?? '', process.env.OPENAI_API_KEY ?? '');
 }
 
@@ -66,6 +76,7 @@ function report(store: Store, run: Run) {
     queuedAction: run.queuedAction ?? null,
     observations: run.observations, hashes: run.hashes, strategy: run.task.strategy ?? 'sequential', hierarchy: run.hierarchy ?? null,
     declaredPlan: run.declaredPlan ?? null,
+    searchState: run.searchState ?? null, segments: run.segments ?? [], monitor: run.monitor ?? null,
     artifacts: run.status === 'succeeded' ? ['changes.patch', 'changes.json'].map((p) => join(store.directory(run.id), p)) : [],
   };
 }
@@ -74,6 +85,7 @@ async function main(): Promise<void> {
   const { values, positionals } = parseArgs({ allowPositionals: true, strict: true, options: {
     help: { type: 'boolean' }, script: { type: 'string' }, model: { type: 'string' },
     provider: { type: 'string' }, 'ollama-url': { type: 'string' },
+    'ollama-think': { type: 'string' },
     strategies: { type: 'string' }, repeats: { type: 'string' }, scripts: { type: 'string' },
     scripted: { type: 'boolean' },
     port: { type: 'string' }, workspace: { type: 'string' },
@@ -81,17 +93,21 @@ async function main(): Promise<void> {
   } });
   if (values.help || positionals.length === 0) { console.log(help); return; }
   const [command, target] = positionals;
-  if (['doctor', 'dashboard', 'mcp'].includes(command!)) {
+  if (['doctor', 'dashboard', 'mcp', 'list'].includes(command!)) {
     if (positionals.length !== 1) throw new Error('This command takes no positional target');
     if (values.script || values.scripts || values.scripted || values.strategies || values.repeats || values['accept-workspace'] || values['confirm-owner-stopped']) throw new Error('Run/comparison options do not apply to this command');
     if (values.provider || values['ollama-url']) throw new Error('Doctor/MCP use local Ollama only; dashboard has no provider options');
+    if (values['ollama-think'] && command !== 'mcp') throw new Error('--ollama-think applies to Ollama runs or MCP');
     if (values.port && command !== 'dashboard') throw new Error('--port only applies to dashboard');
     if (values.workspace && command !== 'mcp') throw new Error('--workspace only applies to MCP');
     if (values.model && command === 'dashboard') throw new Error('--model does not apply to dashboard');
     if (command === 'doctor') { console.log(JSON.stringify(await doctor(values.model ?? process.env.TILLER_MODEL), null, 2)); return; }
     const store = new Store(values['data-dir'] ?? '.tiller');
     try {
-      if (command === 'dashboard') {
+      if (command === 'list') {
+        const { runView } = await import('./interfaces/view.js');
+        console.log(JSON.stringify(store.list().map((run) => runView(store, run)), null, 2));
+      } else if (command === 'dashboard') {
         const port = Number(values.port ?? '0'); if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be 0-65535');
         const { startDashboard } = await import('./interfaces/dashboard.js');
         const result = await startDashboard(store, port); console.log(`Tiller dashboard: ${result.url}`);
@@ -102,7 +118,7 @@ async function main(): Promise<void> {
       } else {
         const { StdioServerTransport } = await import('@modelcontextprotocol/server/stdio');
         const { createMcp } = await import('./interfaces/mcp.js');
-        const mcp = createMcp(store, resolve(values.workspace ?? '.'), values.model ?? process.env.TILLER_MODEL ?? 'lfm2.5:8b');
+        const mcp = createMcp(store, resolve(values.workspace ?? '.'), values.model ?? process.env.TILLER_MODEL ?? 'lfm2.5:8b', thinkOption(values['ollama-think']));
         await mcp.server.connect(new StdioServerTransport());
         await new Promise<void>((done) => {
           let stopping = false;
@@ -117,14 +133,14 @@ async function main(): Promise<void> {
   if (positionals.length !== 2 || !target) throw new Error('Expected a command and task file/run ID; see --help');
   if (!['run', 'resume', 'inspect', 'trace', 'diff', 'cancel', 'reconcile', 'unlock', 'validate', 'compare', 'evaluate'].includes(command!))
     throw new Error(`Unknown command: ${command}`);
-  if ((values.script || values.model || values.provider || values['ollama-url']) && !['run', 'resume', 'compare', 'evaluate'].includes(command!)) throw new Error('Adapter options only apply to run/resume/compare/evaluate');
+  if ((values.script || values.model || values.provider || values['ollama-url'] || values['ollama-think']) && !['run', 'resume', 'compare', 'evaluate'].includes(command!)) throw new Error('Adapter options only apply to run/resume/compare/evaluate');
   if ((values.strategies || values.repeats) && !['compare', 'evaluate'].includes(command!)) throw new Error('Comparison options only apply to compare/evaluate');
   if (values.scripts && command !== 'compare') throw new Error('--scripts only applies to compare');
   if (values.scripted && command !== 'evaluate') throw new Error('--scripted only applies to evaluate');
   if (command === 'evaluate' && values.script) throw new Error('Use --scripted with suite script mappings');
-  if (values.scripted && (values.model || values.provider || values['ollama-url'])) throw new Error('Use either --scripted or provider options');
+  if (values.scripted && (values.model || values.provider || values['ollama-url'] || values['ollama-think'])) throw new Error('Use either --scripted or provider options');
   if (command === 'compare' && values.script) throw new Error('Use --scripts for per-strategy comparison fixtures');
-  if (values.scripts && (values.model || values.provider || values['ollama-url'])) throw new Error('Use either --scripts or provider options');
+  if (values.scripts && (values.model || values.provider || values['ollama-url'] || values['ollama-think'])) throw new Error('Use either --scripts or provider options');
   if (values['accept-workspace'] && command !== 'reconcile') throw new Error('--accept-workspace is only valid for reconcile');
   if (values['confirm-owner-stopped'] && command !== 'unlock') throw new Error('--confirm-owner-stopped is only valid for unlock');
   const loadTask = () => {
@@ -142,7 +158,7 @@ async function main(): Promise<void> {
       process.on('SIGINT', pause); process.on('SIGTERM', pause);
       try {
         const result = await evaluateSuite(store, target, conditions, Number(values.repeats ?? '1'),
-          (_strategy, script) => adapterFor(script, values.model, values.provider, values['ollama-url']),
+          (_strategy, script) => adapterFor(script, values.model, values.provider, values['ollama-url'], values['ollama-think']),
           values.scripted ?? false, controller.signal);
         console.log(JSON.stringify({ path: result.path, status: result.report.status, error: result.report.error,
           cases: result.report.results.map((entry) => ({ id: entry.caseId, partition: entry.partition, path: entry.path, rows: entry.report.rows, evaluations: entry.evaluations ?? [] })) }, null, 2));
@@ -162,7 +178,7 @@ async function main(): Promise<void> {
           return ScriptedAdapter.fromFile(resolve(dirname(file), path));
         };
       } else {
-        const adapter = adapterFor(undefined, values.model, values.provider, values['ollama-url']);
+        const adapter = adapterFor(undefined, values.model, values.provider, values['ollama-url'], values['ollama-think']);
         getAdapter = () => adapter;
       }
       const controller = new AbortController();
@@ -174,7 +190,7 @@ async function main(): Promise<void> {
         process.exitCode = result.report.status === 'completed' ? 0 : 2;
       } finally { process.off('SIGINT', pause); process.off('SIGTERM', pause); }
     } else if (command === 'run' || command === 'resume') {
-      const adapter = adapterFor(values.script, values.model, values.provider, values['ollama-url']);
+      const adapter = adapterFor(values.script, values.model, values.provider, values['ollama-url'], values['ollama-think']);
       const run = command === 'run' ? createRun(store, loadTask(), adapter) : store.load(target);
       console.error(`Run ${run.id}\nWorkspace: ${join(store.directory(run.id), 'workspace')}`);
       const controller = new AbortController();

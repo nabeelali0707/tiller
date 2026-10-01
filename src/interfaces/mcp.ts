@@ -7,9 +7,9 @@ import { RunService } from './service.js';
 import { runView, timeline } from './view.js';
 import { redact } from '../security/redaction.js';
 
-export function createMcp(store: Store, root: string, model: string) {
+export function createMcp(store: Store, root: string, model: string, think?: boolean) {
   const server = new McpServer({ name: 'tiller', version: '0.2.0' });
-  const service = new RunService(store, root, model);
+  const service = new RunService(store, root, model, think);
   const result = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
   const idSchema = z.object({ runId: z.string().uuid() });
   server.registerTool('list_runs', { description: 'List recent local Tiller runs. These are runtime observations.', inputSchema: z.object({}), annotations: { readOnlyHint: true } },

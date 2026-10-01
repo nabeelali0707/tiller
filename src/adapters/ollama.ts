@@ -2,6 +2,13 @@ import { z } from 'zod';
 import type { Adapter, AdapterReply, Run } from '../core/contracts.js';
 import { instructions, contextFor } from './prompt.js';
 import { decisionSchema } from '../core/contracts.js';
+import { Agent, fetch as transportFetch } from 'undici';
+
+// Cold local inference can exceed Node's default 5-minute header timeout.
+// The runtime's abort signal/deadline remains the hard request limit.
+const localDispatcher = new Agent({ headersTimeout: 0, bodyTimeout: 0, connectTimeout: 5000, pipelining: 0 });
+// Keep fetch and its dispatcher on the same Undici version.
+const localFetch: typeof fetch = (input, init) => transportFetch(input as string, { ...init, dispatcher: localDispatcher } as Parameters<typeof transportFetch>[1]) as unknown as Promise<Response>;
 
 const envelope = z.object({
   done: z.boolean(), done_reason: z.string().optional(),
@@ -13,14 +20,14 @@ const envelope = z.object({
 export class OllamaAdapter implements Adapter {
   readonly id: string;
   readonly endpoint: string;
-  constructor(private model: string, endpoint = 'http://127.0.0.1:11434', private request: typeof fetch = fetch) {
+  constructor(private model: string, endpoint = 'http://127.0.0.1:11434', private request: typeof fetch = localFetch, private options: { think?: boolean } = {}) {
     if (!model.trim()) throw new Error('Choose an installed local model with --model or TILLER_MODEL');
     if (/(?:^|[-:])cloud(?:$|[-:])/i.test(model)) throw new Error('Cloud models are not supported by the local Ollama adapter');
     const url = new URL(endpoint);
     if (!['127.0.0.1', '[::1]'].includes(url.hostname) || url.protocol !== 'http:' || url.username || url.password || url.search || url.hash || url.pathname !== '/')
       throw new Error('Ollama endpoint must be an HTTP loopback IP (127.0.0.1 or [::1]), with no credentials or path');
     this.endpoint = url.origin;
-    this.id = `ollama:${this.endpoint}:${model}`;
+    this.id = `ollama:${this.endpoint}:${model}${options.think === undefined ? '' : `:think=${options.think}`}`;
   }
   async next(run: Readonly<Run>, signal: AbortSignal): Promise<AdapterReply> {
     let response: Response;
@@ -28,6 +35,7 @@ export class OllamaAdapter implements Adapter {
       response = await this.request(`${this.endpoint}/api/chat`, {
         method: 'POST', signal, redirect: 'error', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: this.model, stream: false, keep_alive: '2m',
+          ...(this.options.think === undefined ? {} : { think: this.options.think }),
           format: z.toJSONSchema(decisionSchema),
           options: { temperature: 0, num_predict: run.task.budget.maxOutputTokensPerCall, num_ctx: 8192 },
           messages: [{ role: 'system', content: instructions(run) }, { role: 'user', content: JSON.stringify(contextFor(run)) }],
@@ -35,7 +43,9 @@ export class OllamaAdapter implements Adapter {
       });
     } catch (error) {
       if (signal.aborted) throw error;
-      throw new Error('Cannot reach local Ollama. Start ollama serve and choose an installed local model.');
+      const code = (error as { cause?: { code?: string } }).cause?.code;
+      throw new Error(code === 'UND_ERR_HEADERS_TIMEOUT' ? 'Local Ollama response timed out before headers arrived'
+        : 'Local Ollama connection failed during inference; check server availability and request limits');
     }
     if (!response.ok) {
       await response.body?.cancel();

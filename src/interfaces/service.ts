@@ -22,10 +22,10 @@ export function scopedTask(root: string, file: string) {
 
 export class RunService {
   private active = new Map<string, { controller: AbortController; promise: Promise<unknown> }>();
-  constructor(readonly store: Store, private root: string, private model: string) {}
+  constructor(readonly store: Store, private root: string, private model: string, private think?: boolean) {}
   start(file: string) {
     if (this.active.size) throw new Error('This server already has an active run');
-    const task = scopedTask(this.root, file); const adapter = new OllamaAdapter(this.model);
+    const task = scopedTask(this.root, file); const adapter = new OllamaAdapter(this.model, undefined, undefined, this.think === undefined ? {} : { think: this.think });
     const run = createRun(this.store, task, adapter); this.launch(run.id, adapter);
     return runView(this.store, run);
   }
@@ -34,7 +34,7 @@ export class RunService {
     const run = this.store.load(id);
     const base = realpathSync(this.root); const relation = relative(base, realpathSync(run.task.repository));
     if (relation.startsWith('..') || relation.includes(':') || run.task.execution?.mode !== 'docker') throw new Error('Run is outside the configured execution scope');
-    const adapter = new OllamaAdapter(this.model);
+    const adapter = new OllamaAdapter(this.model, undefined, undefined, this.think === undefined ? {} : { think: this.think });
     if (run.adapter !== adapter.id) throw new Error('Configured model must match the original run adapter');
     if (run.pending && run.pending.kind !== 'candidate') throw new Error('Inspect and reconcile the pending operation with the CLI first');
     if (!['paused', 'ready', 'running', 'verifying'].includes(run.status)) throw new Error('Run cannot resume');
