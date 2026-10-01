@@ -85,6 +85,7 @@ export interface Run {
   planVersion: number;
   remainingPlan: string[];
   pending: { id: string; kind: string; detail: unknown; nodeId?: string | null } | null;
+  queuedAction?: Exclude<Action, { type: 'complete' | 'decompose' | 'plan' }>;
   hashes: Record<string, string>;
   baselineDone: boolean;
   observations: Observation[];

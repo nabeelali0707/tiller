@@ -63,6 +63,7 @@ function report(store: Store, run: Run) {
     budget: run.task.budget, spent: { modelCalls: run.calls, toolCalls: run.tools,
       inputTokens: run.inputTokens, outputTokens: run.outputTokens, unknownUsageCalls: run.unknownUsageCalls },
     planVersion: run.planVersion, remainingPlan: run.remainingPlan, pending: run.pending,
+    queuedAction: run.queuedAction ?? null,
     observations: run.observations, hashes: run.hashes, strategy: run.task.strategy ?? 'sequential', hierarchy: run.hierarchy ?? null,
     declaredPlan: run.declaredPlan ?? null,
     artifacts: run.status === 'succeeded' ? ['changes.patch', 'changes.json'].map((p) => join(store.directory(run.id), p)) : [],
@@ -83,6 +84,10 @@ async function main(): Promise<void> {
   if (['doctor', 'dashboard', 'mcp'].includes(command!)) {
     if (positionals.length !== 1) throw new Error('This command takes no positional target');
     if (values.script || values.scripts || values.scripted || values.strategies || values.repeats || values['accept-workspace'] || values['confirm-owner-stopped']) throw new Error('Run/comparison options do not apply to this command');
+    if (values.provider || values['ollama-url']) throw new Error('Doctor/MCP use local Ollama only; dashboard has no provider options');
+    if (values.port && command !== 'dashboard') throw new Error('--port only applies to dashboard');
+    if (values.workspace && command !== 'mcp') throw new Error('--workspace only applies to MCP');
+    if (values.model && command === 'dashboard') throw new Error('--model does not apply to dashboard');
     if (command === 'doctor') { console.log(JSON.stringify(await doctor(values.model ?? process.env.TILLER_MODEL), null, 2)); return; }
     const store = new Store(values['data-dir'] ?? '.tiller');
     try {
@@ -140,7 +145,7 @@ async function main(): Promise<void> {
           (_strategy, script) => adapterFor(script, values.model, values.provider, values['ollama-url']),
           values.scripted ?? false, controller.signal);
         console.log(JSON.stringify({ path: result.path, status: result.report.status, error: result.report.error,
-          cases: result.report.results.map((entry) => ({ id: entry.caseId, path: entry.path, rows: entry.report.rows })) }, null, 2));
+          cases: result.report.results.map((entry) => ({ id: entry.caseId, partition: entry.partition, path: entry.path, rows: entry.report.rows, evaluations: entry.evaluations ?? [] })) }, null, 2));
         process.exitCode = result.report.status === 'completed' ? 0 : 2;
       } finally { process.off('SIGINT', pause); process.off('SIGTERM', pause); }
     } else if (command === 'compare') {

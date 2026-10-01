@@ -42,6 +42,7 @@ export function reconcileRun(store: Store, id: string): Run {
     const pending = run.pending;
     run.hashes = hashes(run.task, join(directory, 'workspace'));
     run.pending = null;
+    delete run.queuedAction;
     if (run.hierarchy) invalidateChecks(run.hierarchy);
     transition(run, 'paused', 'Operator accepted current workspace; all acceptance checks will be rerun');
     observe(run, 'reconciled', { pending, hashes: run.hashes });
@@ -122,6 +123,7 @@ async function executeControlled(store: Store, id: string, adapter: Adapter, ext
       reserve(run, 'tool', 1, final);
       accounting?.reserve('tool');
       run.pending = { id: randomUUID(), kind: 'check', nodeId: final ? null : run.hierarchy?.activeId ?? null, detail: { checkId: definition.id, final } };
+      if (run.queuedAction?.type === 'check') delete run.queuedAction;
       store.save(run, 'operation.started', run.pending);
       const result = run.task.execution?.mode === 'docker'
         ? await sandbox.check(definition, workspace, run.dockerImage!, controller.signal, run.deadline! - Date.now(), run.pending.id)
@@ -142,6 +144,7 @@ async function executeControlled(store: Store, id: string, adapter: Adapter, ext
       reserve(run, 'tool');
       accounting?.reserve('tool');
       run.pending = { id: randomUUID(), kind: action.type, nodeId: run.hierarchy?.activeId ?? null, detail: action };
+      delete run.queuedAction;
       store.save(run, 'operation.started', run.pending);
       let result: unknown;
       try {
@@ -175,6 +178,7 @@ async function executeControlled(store: Store, id: string, adapter: Adapter, ext
         run.baselineDone = true;
         store.save(run, 'baseline.completed');
       }
+      if (run.queuedAction) await tool(run.queuedAction);
       while (true) {
         ensureActive(); assertCheckpoint(run, workspace); assertProtected(run, directory);
         const target = switchTarget(run);
@@ -267,6 +271,7 @@ async function executeControlled(store: Store, id: string, adapter: Adapter, ext
         run.decisionIndex++;
         const reactive = run.task.strategy === 'flat-react' || run.task.strategy === 'plan-react';
         if (!reactive) { run.planVersion++; run.remainingPlan = decision.remainingPlan; }
+        if (decision.action.type !== 'complete') run.queuedAction = decision.action;
         store.save(run, reactive ? 'action.proposed' : 'plan.revised', { version: run.planVersion, ...decision, provenance: 'model-proposed' });
         if (decision.action.type !== 'complete') {
           await tool(decision.action);

@@ -4,7 +4,7 @@
 
 Tiller runs a Sequential loop: propose one bounded action and a revised remaining plan, validate the proposal, persist operation intent, execute through the gateway, record its result and file hashes, then replan. Completion proposals trigger all declared acceptance checks. A failed check returns to the loop; no model completion claim can bypass verification.
 
-The current tool set is read an existing declared file, replace an existing editable file, run a named check, or propose completion. Plans and actions are recorded as immutable event entries. Hierarchical runs also have an initial decomposition operation and runtime-dispatched parent-child work units. New-file creation, arbitrary agent shell access, automatic source patch promotion, MCP, Search, and strategy switching are not implemented.
+The current tool set is read an existing declared file, replace an existing editable file, run a named check, or propose completion. Plans and actions are recorded as immutable event entries. Hierarchical runs also have an initial decomposition operation and runtime-dispatched parent-child work units. See [Search/routing](search-and-routing.md) and [dashboard/MCP](interfaces.md) for additional implemented paths. New-file creation, arbitrary agent shell access and automatic patch application to the original repository remain unsupported.
 
 ## Hierarchical execution
 
@@ -164,6 +164,8 @@ npm run tiller -- resume RUN_ID --model YOUR_MODEL_ID
 Use one of those commands, matching the original run. A script's content hash is part of its identity. Changing it is rejected.
 
 Each external operation has a persisted intent before dispatch and a recorded outcome afterward. A crash in between leaves an unresolved operation. Tiller does not blindly replay a write or check whose side effects may already have happened.
+
+Accepted read/write/check actions are also durably queued before dispatch. If the process stops before an operation intent exists, resume executes that queued action without skipping a script step or requesting another model decision. Creating the operation intent consumes the queue atomically. Reconciliation discards queued actions after the operator accepts a changed workspace.
 
 1. Inspect the trace, pending operation, workspace patch, and any external side effects.
 2. If the worker crashed, inspect the owner process. `unlock RUN_ID --confirm-owner-stopped` removes a stale lock only when the recorded PID is no longer alive. A surviving or reused PID requires manual investigation.

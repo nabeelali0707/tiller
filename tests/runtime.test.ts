@@ -40,6 +40,23 @@ test('real failing check, repair, fresh verification, durable trace and patch; s
   } finally { f.cleanup(); }
 });
 
+test('a durable accepted action that has not started is dispatched on resume without skipping it or charging a new model call', async () => {
+  const f = fixture();
+  try {
+    const adapter = new ScriptedAdapter([repair, complete]);
+    const run = createRun(f.store, f.task, adapter);
+    // Reconstruct the exact checkpoint between decision acceptance and tool intent.
+    run.status = 'paused'; run.deadline = Date.now() + 60000; run.baselineDone = true;
+    run.calls = 1; run.decisionIndex = 1; run.queuedAction = repair.action as NonNullable<typeof run.queuedAction>;
+    f.store.save(run, 'action.proposed', repair);
+    const result = await execute(f.store, run.id, adapter);
+    assert.equal(result.status, 'succeeded', result.message); assert.equal(result.calls, 2);
+    assert.equal(result.queuedAction, undefined); assert.equal(result.pending, null);
+    const completed = f.store.events(run.id).filter((event) => event.type === 'operation.completed');
+    assert.equal(completed.length, 2); // queued write, then real final check
+  } finally { f.cleanup(); }
+});
+
 test('false completion is rejected and subsequent replanning can repair', async () => {
   const f = fixture();
   try {
