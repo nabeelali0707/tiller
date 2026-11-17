@@ -269,6 +269,12 @@ async function executeControlled(store: Store, id: string, adapter: Adapter, ext
             reject('Read-evidence nodes may only read declared files and propose completion'); continue;
           }
         }
+        // An undeclared check has no side effect, so reject it with feedback instead of pausing.
+        // Queuing it would make every resume retry the same failing dispatch.
+        if (decision.action.type === 'check') {
+          const checkId = decision.action.checkId;
+          if (!run.task.checks.some((check) => check.id === checkId)) { reject(`Unknown check: ${checkId}`); continue; }
+        }
         run.decisionIndex++;
         const reactive = run.task.strategy === 'flat-react' || run.task.strategy === 'plan-react';
         if (!reactive) { run.planVersion++; run.remainingPlan = decision.remainingPlan; }

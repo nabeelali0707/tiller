@@ -157,6 +157,21 @@ test('malformed model output never reaches tools and consumes call budget', asyn
   } finally { f.cleanup(); }
 });
 
+test('an undeclared check action is rejected with feedback instead of wedging the run', async () => {
+  const f = fixture();
+  try {
+    const unknown: Decision = { remainingPlan: ['Run checks'], reason: 'Mistyped the check ID', action: { type: 'check', checkId: 'missing-check' } };
+    const adapter = new ScriptedAdapter([unknown, repair, complete]);
+    const run = createRun(f.store, f.task, adapter);
+    const result = await execute(f.store, run.id, adapter);
+    assert.equal(result.status, 'succeeded', result.message);
+    assert.equal(result.calls, 3); assert.equal(result.tools, 3);
+    assert.equal(result.queuedAction, undefined);
+    const rejected = f.store.events(run.id).find((event) => event.type === 'decision.rejected');
+    assert.ok(rejected); assert.match(JSON.stringify(rejected.data), /Unknown check: missing-check/);
+  } finally { f.cleanup(); }
+});
+
 test('expired resumed run receives no fresh duration or call budget', async () => {
   const f = fixture();
   try {
