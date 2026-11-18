@@ -60,3 +60,15 @@ test('state and ordered events persist together and cancellation survives state 
     store.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+test('unlock reports a missing lock clearly instead of leaking a raw filesystem error', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tiller-unlock-'));
+  try {
+    const store = new Store(dir);
+    const run = makeRun();
+    store.save(run, 'created');
+    assert.throws(() => store.unlock(run.id), /No owner lock present/);
+    const release = store.lock(run.id); release();
+    assert.throws(() => store.unlock(run.id), /No owner lock present/);
+    store.close();
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

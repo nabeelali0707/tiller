@@ -79,7 +79,13 @@ export class Store {
   unlock(id: string): void {
     this.load(id);
     const path = join(this.directory(id), 'owner.lock');
-    const pid = Number(readFileSync(path, 'utf8'));
+    let raw: string;
+    try { raw = readFileSync(path, 'utf8'); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('No owner lock present; the run is not locked');
+      throw error;
+    }
+    const pid = Number(raw);
     if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('Invalid owner PID');
     try { process.kill(pid, 0); }
     catch (e) {
